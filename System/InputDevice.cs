@@ -78,42 +78,63 @@ namespace Transonic.MIDI.System
 
 // midi funcs -----------------------------------------------------------------
 
+        //open the input device and set its event handler to HandleMessage()
         public void open()
         {
             if (!opened)
             {
                 midiInProc = HandleMessage;
                 MMRESULT result = midiInOpen(out devHandle, devID, midiInProc, IntPtr.Zero, CALLBACK_FUNCTION);
+                if (result != MMRESULT.MMSYSERR_NOERROR)
+                {
+                    throw new MidiSystemException("couldn't open input device " + devName);
+                }
                 opened = true;
                 //Console.WriteLine("opened device " + devName + " result = " + result);
             }
         }
 
+        //start the input device sending midi event msgs to HandleMessage() until stop() is called
         public void start()
         {
             if (!started)
             {
                 MMRESULT result = midiInStart(devHandle);
+                if (result != MMRESULT.MMSYSERR_NOERROR)
+                {
+                    throw new MidiSystemException("couldn't start input device " + devName);
+                }
                 started = true;
                 //Console.WriteLine("started device " + devName + " result = " + result);
             }
         }
 
+        //stop the input device from sending events msgs to HandleMesage()
         public void stop() 
         {
             if (started)
             {
                 MMRESULT result = midiInStop(devHandle);
+                if (result != MMRESULT.MMSYSERR_NOERROR)
+                {
+                    throw new MidiSystemException("couldn't stop input device " + devName);
+                }
                 started = false;
                 //Console.WriteLine("stopped device " + devName + " result = " + result);
             }
         }
 
+        //close the input device and free up system resources
+        //if this isn't called when shutting down, it can cause the program to hang and the device to be unavailable
         public void close()
         {
             if (opened)
             {
                 MMRESULT result = midiInClose(devHandle);
+                if (result != MMRESULT.MMSYSERR_NOERROR)
+                {
+                    throw new MidiSystemException("couldn't close input device " + devName);
+                }
                 opened = false;
                 //Console.WriteLine("closed device " + devName + " result = " + result);
             }
@@ -129,6 +150,11 @@ namespace Transonic.MIDI.System
         const int MIM_LONGERROR = 0x3C6;
         const int MIM_MOREDATA = 0x3CC;
 
+        //when the device receives incoming midi data, it sends a message here of one of the above types
+        //the midi data is passed in the params, MIM_DATA is for a short midi msg, all 3 midi bytes are packed into param1
+
+        //when we recieve any midi data, we send it all the connected system units as a raw array of bytes
+        //we let the system unit convert it to a midi msg, filter it and send it through the unit graph 
         private void HandleMessage(int handle, int msg, int instance, int param1, int param2)
         {
             if (msg == MIM_OPEN)    

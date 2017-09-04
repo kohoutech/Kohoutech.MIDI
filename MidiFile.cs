@@ -31,145 +31,166 @@ namespace Transonic.MIDI
 {
     public class MidiFile
     {
-        MidiSystem midiSystem;
-        public String filename;
-
-        byte[] midiData;
-        int dataPos;
-        uint currentTime;       //event time in ticks
-        int runningStatus;
-
-        public MidiFile(MidiSystem _system, String _filename)
-        {
-            midiSystem = _system;
-            filename = _filename;
-        }
+        static uint currentTime;       //event time in ticks
+        static int runningStatus;
 
 //- loading -------------------------------------------------------------------
 
-        public Sequence readMidiFile()
+        public static Sequence readMidiFile(String filename)
         {
-            midiData = File.ReadAllBytes(filename);
-            dataPos = 0;
+            MidiInStream stream = new MidiInStream(filename);
 
             //read midi file header
-            String sig = getString(4);
-            uint hdrsize = getFour();
-            uint fileFormat = getTwo();
-            int trackCount = (int)getTwo();
-            int division = (int)getTwo();
+            String sig = stream.getString(4);
+            uint hdrsize = stream.getFour();
+            int fileFormat = stream.getTwo();
+            int trackCount = stream.getTwo();
+            int division = stream.getTwo();
 
-            Console.WriteLine("sig = {0}, file format = {1}, track count = {2}, div = {3}", sig, fileFormat, trackCount, division);
+            if (!sig.Equals("MThd") || hdrsize != 6)
+            {
+                throw new MidiFileException(filename + " is not a valid MIDI file ", 0);
+            }
 
             Sequence seq = new Sequence(division);
 
             //read midi track data
             for (int i = 0; i < trackCount; i++)
             {
-                Console.WriteLine("loading track {0}", i);
-                Track track = loadTrackData(i);
-                track.setOutputDevice(midiSystem.outputDevices[0]);
-                //track.setOutputChannel(i+1);
-                seq.setTrack(track, i);
+                Track track = loadTrackData(stream);
+                seq.addTrack(track);
             }
 
             seq.finalizeLoad();
-
             return seq;
         }
 
-        public Track loadTrackData(int num)
+        private static Track loadTrackData(MidiInStream stream)
         {
-            String trackSig = getString(4);
-            uint trackDataLength = getFour();
+            //read track header
+            String trackSig = stream.getString(4);
+            uint trackDataLength = stream.getFour();
 
-            Track track = new Track(num);
-            int startpos = dataPos;
+            Track track = new Track();
             currentTime = 0;
             runningStatus = 0;
-            while ((dataPos - startpos) < trackDataLength)
+            Event evt;
+            do
             {
-                Event msg = loadMessageData();
-                track.addEvent(msg);
-            }
+                evt = loadEventData(stream);
+                track.addEvent(evt);
+            } while (!(evt.msg is EndofTrackMessage));
             return track;
         }
 
-        public uint getVariableLengthVal()
-        {
-            uint result = 0;         //largest var len quant allowed = 0xffffffff
-            uint b = getOne();
-            while (b >= 0x80)
-            {
-                uint d = b % 128;
-                result *= 128;
-                result += d;
-                b = getOne();
-            }
-            result *= 128;
-            result += b;
-            return result;
-        }
-
-        Event loadMessageData()         
+        private static Event loadEventData(MidiInStream stream)
         {
             Message msg = null;
-            currentTime += getVariableLengthVal();      //add delta time to current num of ticks
-            int status = (int)getOne();
+            currentTime += stream.getVariableLengthVal();      //add delta time to current num of ticks
+            int status = stream.getOne();
             if (status < 0x80)              //running status 
             {
-                pushBack(1);
+                stream.pushBack(1);
                 status = runningStatus;
             }
-            msg = Message.getMessage(midiData, dataPos);                
+            msg = Message.getMessage(stream, status);
             runningStatus = status;
-            if (msg == null) 
-                Console.WriteLine("got a null msg at {0} with a status of {1}", dataPos, status.ToString("X2"));
             Event evt = new Event(currentTime, msg);
             return evt;
         }
 
 //- saving -------------------------------------------------------------------
 
-        public void writeMidiFile(Sequence seq)
+        public static void writeMidiFile(Sequence seq, String filename)
         {
+            MidiOutStream stream = new MidiOutStream(filename);
+
             //midi file header
-            List<byte> outbytes = new List<byte>();
-            outbytes.AddRange(Encoding.ASCII.GetBytes("MThd"));
-            outbytes.AddRange(putFour(6));
-            outbytes.AddRange(putTwo(1));
-            outbytes.AddRange(putTwo(seq.lastTrack + 1));
-            outbytes.AddRange(putTwo(seq.division));
+            stream.putString("MThd");
+            stream.putFour(6);                      //header size
+            stream.putTwo(1);                       //type 1 midi file
+            stream.putTwo(seq.tracks.Count);        //track count
+            stream.putTwo(seq.division);            //division
 
-            for(int trackNum = 0; trackNum <= seq.lastTrack; trackNum++) {                
-                List<byte> trackbytes = seq.tracks[trackNum].saveTrack(this);
-                outbytes.AddRange(trackbytes);
+            for (int trackNum = 0; trackNum < seq.tracks.Count; trackNum++)
+            {                
+                seq.tracks[trackNum].saveTrack(stream);
             }
+        }
+    }
 
-            File.WriteAllBytes(filename, outbytes.ToArray());
+//-----------------------------------------------------------------------------
+
+    //midi files store data in big endian format!
+    public class MidiInStream
+    {
+        public String filename;
+        byte[] midiData;
+        int dataSize;
+        int dataPos;
+
+        //read midi data from file
+        public MidiInStream(String _filename)
+        {
+            filename = _filename;
+            try
+            {
+                midiData = File.ReadAllBytes(filename);
+            }
+            catch (FileNotFoundException e)
+            {
+                throw new MidiFileException("couldn't open " + filename, 0);
+            }
+            catch (Exception e)
+            {
+                throw new MidiFileException("couldn't read MIDI data from " + filename, 0);
+            }
+            dataSize = midiData.Length;
+            dataPos = 0;
         }
 
-//- utility methods -----------------------------------------------------------
-
-        //midi files store data in big endian format!
-
-        public uint getOne()
+        //read midi data from incoming midi bytes
+        public MidiInStream(byte[] data)
         {
+            midiData = data;
+            dataSize = midiData.Length;
+            dataPos = 0;
+        }
+
+        public int getDataPos()
+        {
+            return dataPos;
+        }
+
+        public void checkStream(int size)
+        {
+            if (dataPos + size > dataSize)
+            {
+                throw new MidiFileException("tried to read past end of file " + filename, dataPos);
+            }
+        }
+
+        public int getOne()
+        {
+            checkStream(1);
             byte a = midiData[dataPos++];
-            uint result = (uint)(a);
+            int result = (int)(a);
             return result;
         }
 
-        public uint getTwo()
+        public int getTwo()
         {
+            checkStream(2);
             byte a = midiData[dataPos++];
             byte b = midiData[dataPos++];
-            uint result = (uint)(a * 256 + b);
+            int result = (int)(a * 256 + b);
             return result;
         }
 
+        //returns unsigned 4 byte val
         public uint getFour()
         {
+            checkStream(4);
             byte a = midiData[dataPos++];
             byte b = midiData[dataPos++];
             byte c = midiData[dataPos++];
@@ -180,22 +201,37 @@ namespace Transonic.MIDI
             return result;
         }
 
-        public String getString(int width)
+        public uint getVariableLengthVal()
         {
-            String result = "";
-            for (int i = 0; i < width; i++)
+            uint result = 0;                        //largest var len quant allowed = 0xffffffff
+            uint b = (uint)getOne();
+            while (b >= 0x80)
             {
-                byte a = midiData[dataPos++];
-                if ((a >= 0x20) && (a <= 0x7E))
-                {
-                    result += (char)a;
-                }
+                uint d = b % 128;
+                result *= 128;
+                result += d;
+                b = (uint)getOne();
             }
+            result *= 128;
+            result += b;
             return result;
+        }
+
+        public String getString(int length)
+        {
+            checkStream(length);
+            StringBuilder result = new StringBuilder(length);
+            for (int i = 0; i < length; i++)
+            {
+                char a = (char)midiData[dataPos++];
+                result.Append(a);
+            }
+            return result.ToString();
         }
 
         public void skipBytes(int skip)
         {
+            checkStream(skip);
             dataPos += skip;
         }
 
@@ -203,29 +239,99 @@ namespace Transonic.MIDI
         {
             dataPos -= backup;
         }
+    }
 
-        public byte[] putTwo(int val)
+//-----------------------------------------------------------------------------
+
+    //midi files store data in big endian format!
+    public class MidiOutStream
+    {
+        public String filename;
+        List<byte> midiData;
+
+        public MidiOutStream(String _filename)
         {
-            byte[] result = new byte[2];
-            result[1] = (byte)(val % 256);
+            filename = _filename;
+            midiData = new List<byte>();
+        }
+
+        public void putOne(int val)
+        {
+            byte a = (byte)(val % 256);
+            midiData.Add(a);
+        }
+
+        public void putTwo(int val)
+        {
+            byte b = (byte)(val % 256);
             val /= 256;
-            result[0] = (byte)(val % 256);
+            byte a = (byte)(val % 256);
+            midiData.Add(a);
+            midiData.Add(b);
+        }
+
+        public void putFour(int val)
+        {
+            byte d = (byte)(val % 256);
+            val /= 256;
+            byte c = (byte)(val % 256);
+            val /= 256;
+            byte b = (byte)(val % 256);
+            val /= 256;
+            byte a = (byte)(val % 256);
+            midiData.Add(a);
+            midiData.Add(b);
+            midiData.Add(c);
+            midiData.Add(d);            
+        }
+
+        public List<byte> getVarLenQuantity(uint delta)
+        {
+            List<byte> result = new List<byte>();
+            for (int i = 0; i < 4; i++)
+            {
+                if (delta >= 0x80)
+                {
+                    result.Add((byte)(delta % 0x80));
+                    delta /= 0x80;
+                }
+                else
+                {
+                    result.Add((byte)delta);
+                    break;
+                }
+            }
+            result.Reverse();
+            for (int i = 0; i < result.Count - 1; i++)
+                result[i] += 0x80;
             return result;
         }
 
-        public byte[] putFour(int val)
+        public void putString(String s)
         {
-            byte[] result = new byte[4];
-            result[3] = (byte)(val % 256);
-            val /= 256;
-            result[2] = (byte)(val % 256);
-            val /= 256;
-            result[1] = (byte)(val % 256);
-            val /= 256;
-            result[0] = (byte)(val % 256);
-            return result;
+            byte[] data = Encoding.ASCII.GetBytes(s);
+            midiData.AddRange(data);
         }
 
+        public void putData(byte[] data)
+        {
+            midiData.AddRange(data);
+        }
+
+        public void writeOut()
+        {
+            File.WriteAllBytes(filename, midiData.ToArray());
+        }
+    }
+
+//-----------------------------------------------------------------------------
+
+    public class MidiFileException : Exception
+    {
+        public MidiFileException(String errorMsg, int pos) : base(errorMsg + " at pos [" + pos.ToString() + "]")
+        {
+        }
     }
 }
 
+//Console.WriteLine("there's no sun in the shadow of the wizard");

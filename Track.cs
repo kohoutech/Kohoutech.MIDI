@@ -26,10 +26,8 @@ using Transonic.MIDI.System;
 
 namespace Transonic.MIDI
 {
-    public class Track
+    public class Track : SystemUnit
     {
-        public int number;
-        public String name;
         public List<Event> events;
         public int duration;
 
@@ -51,10 +49,9 @@ namespace Transonic.MIDI
         public int volume;
         public int pan;
 
-        public Track(int _num)
+        public Track() : base("foo")
         {
-            number = _num;
-            name = "Track " + number.ToString();
+            name = null;
             events = new List<Event>();
 
             muted = false;
@@ -72,6 +69,7 @@ namespace Transonic.MIDI
 
         public void setName(String _name)
         {
+            name = _name;
         }
 
         public void setMuted(bool on)
@@ -137,7 +135,12 @@ namespace Transonic.MIDI
         {
             if (!muted)
             {
-                //outDev.sendMessage(msg, outputChannel);
+                byte[] bytes = msg.getDataBytes();
+                if (msg is ChannelMessage)
+                {
+                    bytes[0] |= (byte)outputChannel;
+                }
+                outDev.sendMessage(bytes);
             }
         }
 
@@ -195,9 +198,9 @@ namespace Transonic.MIDI
                 if (!haveVolume && events[i].msg is ControllerMessage)
                 {
                     ControllerMessage ctrlMsg = (ControllerMessage)events[i].msg;
-                    if (ctrlMsg.controllerNumber == 7)
+                    if (ctrlMsg.ctrlNumber == 7)
                     {
-                        volume = ctrlMsg.controllerValue;
+                        volume = ctrlMsg.ctrlValue;
                         haveVolume = true;
                     }
                 }
@@ -208,47 +211,25 @@ namespace Transonic.MIDI
 
 //- track saving -------------------------------------------------------------
 
-        public List<byte> saveTrack(MidiFile midifile)
+        public void saveTrack(MidiOutStream stream)
         {
-            List<byte> bytes = new List<byte>();
+            List<byte> data = new List<byte>();
 
             uint curtime = 0;
             foreach(Event evt in events) {
                 uint delta = evt.time - curtime;
                 curtime = evt.time;
-                List<byte> vardelta = getVarLenQuantity(delta);
-                bytes.AddRange(vardelta);
+                List<byte> vardelta = stream.getVarLenQuantity(delta);
+                data.AddRange(vardelta);
                 byte[] msgbytes = evt.msg.getDataBytes();
-                bytes.AddRange(msgbytes);
+                data.AddRange(msgbytes);
             }
 
             //track header
-            int size = bytes.Count;
-            bytes.InsertRange(0, Encoding.ASCII.GetBytes("MTrk"));
-            bytes.InsertRange(4,midifile.putFour(size));
-
-            return bytes;
-        }
-
-        public List<byte> getVarLenQuantity(uint delta) 
-        {
-            List<byte> result = new List<byte>();
-            for (int i = 0; i < 4; i++)
-            {
-                if (delta >= 0x80)
-                {
-                    result.Add((byte)(delta % 0x80));
-                    delta /= 0x80;
-                } else 
-                {
-                    result.Add((byte)delta);
-                    break;
-                }
-            }
-            result.Reverse();
-            for (int i = 0; i < result.Count - 1; i++)
-                result[i] += 0x80;
-            return result;
+            int size = data.Count;
+            stream.putString("MTrk");
+            stream.putFour(size);
+            stream.putData(data.ToArray());
         }
 
         public void dump()

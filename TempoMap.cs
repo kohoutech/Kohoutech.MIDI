@@ -24,26 +24,28 @@ using System.Text;
 
 namespace Transonic.MIDI
 {
-    public class Event : IComparable<Event>
+    class TempoMap
     {
-        public uint time;
-        public Message msg;
+    }
 
-        public Event(uint _time, Message _msg)
-        {
-            time = _time;       //time in ticks
-            msg = _msg;         //midi message
-        }
+//-----------------------------------------------------------------------------
 
-        public void dump()
+    //maps a tempo message or a time signature message to a elapsed time, so if move the cur pos
+    //in a sequence, we can calculate what time that is; needs to be recalculated any time tempo or time sig change
+    public class Tempo
+    {
+        public int tick;
+        public int microsec;
+        public int beat;
+
+        public Tempo(int _tick, int _microsec, int _beat)
         {
-            Console.WriteLine("time = {0}, msg = {1}", time, msg);
-        }
-        
-        public int CompareTo(Event other)
-        {
-            return this.time.CompareTo(other.time);
+            tick = _tick;
+            microsec = _microsec;
+            beat = _beat;
         }
     }
-    
+
+
+
 }

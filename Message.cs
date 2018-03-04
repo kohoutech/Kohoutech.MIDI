@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
 Transonic MIDI Library
-Copyright (C) 1995-2017  George E Greaney
+Copyright (C) 1995-2018  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -81,6 +81,16 @@ namespace Transonic.MIDI
                     break;
                 default :
                     break;
+            }
+            //convert noteon msg w/ vel = 0 to noteoff msg
+            if (msg is NoteOnMessage)
+            {
+                NoteOnMessage noteOn = (NoteOnMessage)msg;
+                if (noteOn.velocity == 0)
+                {
+                    NoteOffMessage noteOff = new NoteOffMessage(noteOn.channel, noteOn.noteNumber, 0);
+                    msg = noteOff;
+                }
             }
             return msg;
         }
@@ -687,7 +697,7 @@ namespace Transonic.MIDI
     public class TempoMessage : MetaMessage             //0xff 0x51
     {
         public int tempo;
-        public Timing timing;
+        public Tempo timing;
 
         public TempoMessage(MidiInStream stream)
             : base(stream)

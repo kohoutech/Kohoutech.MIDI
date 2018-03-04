@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
 Transonic MIDI Library
-Copyright (C) 1995-2017  George E Greaney
+Copyright (C) 1995-2018  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -96,7 +96,7 @@ namespace Transonic.MIDI
                     int msgtick = (int)evt.time;                                //the tick this tempo message occurs at
                     int delta = (msgtick - prevtick);                           //amount of ticks at _prev_ tempo
                     time += (int)((((float)delta) / division) * tempo);         //calc time in microsec of this tempo event
-                    tempoMsg.timing = new Timing(msgtick, time, 0);
+                    tempoMsg.timing = new Tempo(msgtick, time, 0);
                     tempoMap.Add(evt);
 
                     prevtick = msgtick;
@@ -122,24 +122,5 @@ namespace Transonic.MIDI
             }
         }
     }
-
-//-----------------------------------------------------------------------------
-
-    //maps a tempo message or a time signature message to a elapsed time, so if move the cur pos
-    //in a sequence, we can calculate what time that is; needs to be recalculated any time tempo or time sig change
-    public class Timing
-    {
-        public int tick;
-        public int microsec;
-        public int beat;
-
-        public Timing(int _tick, int _microsec, int _beat)
-        {
-            tick = _tick;
-            microsec = _microsec;
-            beat = _beat;
-        }
-    }
-
 
 }

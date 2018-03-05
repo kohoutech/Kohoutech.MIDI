@@ -24,8 +24,9 @@ using System.Text;
 
 namespace Transonic.MIDI
 {
-    class TempoMap
+    public class TempoMap
     {
+        public List<Tempo> tempos;
     }
 
 //-----------------------------------------------------------------------------
@@ -45,7 +46,4 @@ namespace Transonic.MIDI
             beat = _beat;
         }
     }
-
-
-
 }

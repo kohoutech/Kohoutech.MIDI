@@ -26,6 +26,8 @@ using System.IO;
 using Transonic.MIDI.System;
 
 //J Glatt's Midi page: http://midi.teragonaudio.com/tech/midifile.htm
+//Somascape's MIDI Files Specification: http://www.somascape.org/midi/tech/mfile.html
+//Standard MIDI-File Format Spec. 1.1 http://www.music.mcgill.ca/~ich/classes/mumt306/midiformat.pdf
 
 namespace Transonic.MIDI
 {
@@ -57,7 +59,7 @@ namespace Transonic.MIDI
             //read midi track data
             for (int i = 0; i < trackCount; i++)
             {
-                Track track = loadTrackData(stream);
+                Track track = loadTrackData(stream, i);
                 seq.addTrack(track);
             }
 
@@ -65,27 +67,34 @@ namespace Transonic.MIDI
             return seq;
         }
 
-        private static Track loadTrackData(MidiInStream stream)
+        private static Track loadTrackData(MidiInStream stream, int trackNum)
         {
             //read track header
             String trackSig = stream.getString(4);
             uint trackDataLength = stream.getFour();
 
+            if (!trackSig.Equals("MTrk"))
+            {
+                throw new MidiFileException(stream.filename + " has an invalid track", stream.getDataPos() - 8);
+            }
+
             Track track = new Track();
+            int startpos = stream.getDataPos();
             currentTime = 0;
             runningStatus = 0;
             Event evt;
-            do
+            while ((stream.getDataPos() - startpos) < trackDataLength)
             {
                 evt = loadEventData(stream);
                 track.addEvent(evt);
-            } while (!(evt.msg is EndofTrackMessage));
+            } 
+
             return track;
         }
 
         private static Event loadEventData(MidiInStream stream)
         {
-            Message msg = null;
+            Event evt = null;
             currentTime += stream.getVariableLengthVal();      //add delta time to current num of ticks
             int status = stream.getOne();
             if (status < 0x80)              //running status 
@@ -93,10 +102,166 @@ namespace Transonic.MIDI
                 stream.pushBack(1);
                 status = runningStatus;
             }
-            msg = Message.getMessage(stream, status);
-            runningStatus = status;
-            Event evt = new Event(currentTime, msg);
+            if (status >= 0x80 && status < 0xf0)             //message event
+            {
+                Message msg = loadMessageData(stream, status);
+                runningStatus = status;
+                evt = new MessageEvent(currentTime, msg);
+            }
+            else if (status == 0xff)
+            {
+                evt = loadMetaEventData(stream);
+            }
             return evt;
+        }
+
+        private static Message loadMessageData(MidiInStream stream, int status)
+        {
+            Message msg = null;
+
+            if (status < 0xF0)
+            {
+                int msgtype = status / 16;
+                int channel = status % 16;
+                int b1 = stream.getOne();
+                int b2 = 0;
+                if ((msgtype != 0xC) && (msgtype != 0xD))
+                {
+                    b2 = stream.getOne();
+                }
+                switch (msgtype)
+                {
+                    case 0x8:
+                        msg = new NoteOffMessage(channel, b1, b2);
+                        break;
+                    case 0x9:
+                        msg = new NoteOnMessage(channel, b1, b2);
+                        break;
+                    case 0xa:
+                        msg = new AftertouchMessage(channel, b1, b2);
+                        break;
+                    case 0xb:
+                        msg = new ControllerMessage(channel, b1, b2);
+                        break;
+                    case 0xc:
+                        msg = new PatchChangeMessage(channel, b1);
+                        break;
+                    case 0xd:
+                        msg = new ChannelPressureMessage(channel, b1);
+                        break;
+                    case 0xe:
+                        int wheelamt = ((b1 % 128) * 128) + (b2 % 128);
+                        msg = new PitchWheelMessage(channel, wheelamt);
+                        break;
+                    default:
+                        break;
+                }
+                //convert noteon msg w/ vel = 0 to noteoff msg
+                if (msg is NoteOnMessage)
+                {
+                    NoteOnMessage noteOn = (NoteOnMessage)msg;
+                    if (noteOn.velocity == 0)
+                    {
+                        NoteOffMessage noteOff = new NoteOffMessage(noteOn.channel, noteOn.noteNumber, 0);
+                        msg = noteOff;
+                    }
+                }
+            }
+            else if (status == 0xF0)            //sysex
+            {
+                int len = stream.getOne();
+                List<byte> sysExData = new List<byte>(len);
+                for (int i = 0; i < len; i++) 
+                {
+                    byte b1 = (byte)stream.getOne();
+                    sysExData.Add(b1);
+                }            
+                msg = new SysExMessage(sysExData);
+            }
+            else
+            {
+                int b1 = 0;
+                int b2 = 0;
+                int datalen = SystemMessage.SysMsgLen[status - 0xF0] - 1;
+                if (datalen > 0)
+                {
+                    b1 = stream.getOne();
+                }
+                if (datalen > 1)
+                {
+                    b2 = stream.getOne();
+                    b1 = ((b1 % 128) * 128) + (b2 % 128);
+                }
+                msg = new SystemMessage(status, b1);
+            }
+
+            return msg;
+        }
+
+        private static MetaEvent loadMetaEventData(MidiInStream stream)
+        {
+            //new MetaEvent(currentTime, stream);
+            MetaEvent meta = null;
+            int metatype = stream.getOne();
+            uint metalen = stream.getVariableLengthVal();
+            switch (metatype)
+            {
+                case 0x00:
+                    meta = new SequenceNumberMessage(stream);
+                    break;
+                case 0x01:
+                    meta = new TextMessage(stream);
+                    break;
+                case 0x02:
+                    meta = new CopyrightMessage(stream);
+                    break;
+                case 0x03:
+                    meta = new TrackNameMessage(stream);
+                    break;
+                case 0x04:
+                    meta = new InstrumentMessage(stream);
+                    break;
+                case 0x05:
+                    meta = new LyricMessage(stream);
+                    break;
+                case 0x06:
+                    meta = new MarkerMessage(stream);
+                    break;
+                case 0x07:
+                    meta = new CuePointMessage(stream);
+                    break;
+                case 0x08:
+                    meta = new PatchNameMessage(stream);
+                    break;
+                case 0x09:
+                    meta = new DeviceNameMessage(stream);
+                    break;
+                case 0x20:
+                    meta = new MidiChannelMessage(stream);
+                    break;
+                case 0x21:
+                    meta = new MidiPortMessage(stream);
+                    break;
+                case 0x2f:
+                    meta = new EndofTrackMessage(stream);
+                    break;
+                case 0x51:
+                    meta = new TempoMessage(stream);
+                    break;
+                case 0x54:
+                    meta = new SMPTEOffsetMessage(stream);
+                    break;
+                case 0x58:
+                    meta = new TimeSignatureMessage(stream);
+                    break;
+                case 0x59:
+                    meta = new KeySignatureMessage(stream);
+                    break;
+                default:
+                    meta = new UnknownMetaMessage(stream, metatype);
+                    break;
+            }
+            return meta;
         }
 
 //- saving -------------------------------------------------------------------

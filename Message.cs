@@ -287,27 +287,17 @@ namespace Transonic.MIDI
 
     public class SysExMessage : Message
     {
-        List<int> sysExData;
+        List<byte> sysExData;
 
-        public SysExMessage(MidiInStream stream)
+        public SysExMessage(List<byte> _data)
             : base()
         {
-            sysExData = new List<int>();
-            int b1 = stream.getOne();
-            while (b1 != 0xf7)
-            {
-                sysExData.Add(b1);
-                b1 = stream.getOne();
-            }            
+            sysExData = _data;
         }
 
         override public byte[] getDataBytes()
         {
-            byte[] bytes = new byte[sysExData.Count];
-            for (int i = 0; i < sysExData.Count; i++)
-            {
-                bytes[i] = (byte)sysExData[i];
-            }
+            byte[] bytes = sysExData.ToArray();
             return bytes;
         }
     }
@@ -331,10 +321,12 @@ namespace Transonic.MIDI
 
     public class SystemMessage : Message
     {
+        public static int[] SysMsgLen = {1, 2, 3, 2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1};      //f4, f5, fd are undefined
+
         SYSTEMMESSAGE msgtype;
         int value;
 
-        public SystemMessage(MidiInStream stream, int status)
+        public SystemMessage(int status, int val)
             : base()
         {
             msgtype = (SYSTEMMESSAGE)status;
@@ -343,19 +335,13 @@ namespace Transonic.MIDI
             {
                 case SYSTEMMESSAGE.QUARTERFRAME :
                 case SYSTEMMESSAGE.SONGSELECT :
-                    value = stream.getOne();
-                    break;
                 case SYSTEMMESSAGE.SONGPOSITION:
-                    int b1 = stream.getOne();
-                    int b2 = stream.getOne();
-                    value = b1 * 128 + b2;
+                    value = val;
                     break;
                 default :
                     break;
             }        
         }
-
-        int[] SysMsgLen = {1, 2, 3, 2, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0};
 
         override public byte[] getDataBytes()
         {

@@ -27,6 +27,14 @@ namespace Transonic.MIDI
     public class TempoMap
     {
         public List<Tempo> tempos;
+        public int count;
+
+        public TempoMap()
+        {
+            Tempo tempo = new Tempo(0, 500000, 0);
+            tempos.Add(tempo);
+            count = 1;
+        }
     }
 
 //-----------------------------------------------------------------------------
@@ -36,13 +44,13 @@ namespace Transonic.MIDI
     public class Tempo
     {
         public int tick;
-        public int microsec;
+        public int time;
         public int beat;
 
-        public Tempo(int _tick, int _microsec, int _beat)
+        public Tempo(int _tick, int _time, int _beat)
         {
             tick = _tick;
-            microsec = _microsec;
+            time = _time;
             beat = _beat;
         }
     }

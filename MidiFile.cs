@@ -34,10 +34,15 @@ namespace Transonic.MIDI
     public class MidiFile
     {
         static uint currentTime;       //event time in ticks
+        static int curTrackNum;
         static int runningStatus;
+        static bool sysexCont;
+        static SysExMessage prevSysEx;
+
 
 //- loading -------------------------------------------------------------------
 
+        //read in a midi seqence from a standard midi file
         public static Sequence readMidiFile(String filename)
         {
             MidiInStream stream = new MidiInStream(filename);
@@ -59,7 +64,8 @@ namespace Transonic.MIDI
             //read midi track data
             for (int i = 0; i < trackCount; i++)
             {
-                Track track = loadTrackData(stream, i);
+                curTrackNum = i;
+                Track track = loadTrackData(stream);
                 seq.addTrack(track);
             }
 
@@ -67,7 +73,8 @@ namespace Transonic.MIDI
             return seq;
         }
 
-        private static Track loadTrackData(MidiInStream stream, int trackNum)
+        //read data from a single track chunk
+        private static Track loadTrackData(MidiInStream stream)
         {
             //read track header
             String trackSig = stream.getString(4);
@@ -75,61 +82,77 @@ namespace Transonic.MIDI
 
             if (!trackSig.Equals("MTrk"))
             {
-                throw new MidiFileException(stream.filename + " has an invalid track", stream.getDataPos() - 8);
+                throw new MidiFileException(stream.filename + " has an invalid track at ", stream.getDataPos() - 8);
             }
 
             Track track = new Track();
+
             int startpos = stream.getDataPos();
             currentTime = 0;
             runningStatus = 0;
+            sysexCont = false;
+            prevSysEx = null;
             Event evt;
             while ((stream.getDataPos() - startpos) < trackDataLength)
             {
                 evt = loadEventData(stream);
-                track.addEvent(evt);
+                if (evt != null)
+                {
+                    track.addEvent(evt);
+                }
             } 
 
             return track;
         }
 
+        //read data for a single event in a track's data, convert the event's delta time to an absolute track time
         private static Event loadEventData(MidiInStream stream)
         {
             Event evt = null;
+
             currentTime += stream.getVariableLengthVal();      //add delta time to current num of ticks
+
             int status = stream.getOne();
             if (status < 0x80)              //running status 
             {
                 stream.pushBack(1);
                 status = runningStatus;
             }
-            if (status >= 0x80 && status < 0xf0)             //message event
+            if (status >= 0x80 && status < 0xff)             //message event
             {
                 Message msg = loadMessageData(stream, status);
                 runningStatus = status;
                 evt = new MessageEvent(currentTime, msg);
             }
-            else if (status == 0xff)
+            else if (status == 0xff)                        //meta event
             {
-                evt = loadMetaEventData(stream);
+                evt = loadMetaEventData(stream);            //this may return null for unrecognized events
+            }
+            else
+            {
+                throw new MidiFileException(stream.filename + " has an invalid event at", stream.getDataPos() - 8);
             }
             return evt;
         }
 
+        //read data for a midi message (80 - ff), handle sysex continuation and escape sequences
         private static Message loadMessageData(MidiInStream stream, int status)
         {
             Message msg = null;
 
-            if (status < 0xF0)
+            if (status < 0xF0)          //midi channel message
             {
                 int msgtype = status / 16;
                 int channel = status % 16;
+
                 int b1 = stream.getOne();
                 int b2 = 0;
                 if ((msgtype != 0xC) && (msgtype != 0xD))
                 {
                     b2 = stream.getOne();
                 }
-                switch (msgtype)
+
+                switch (msgtype)        
                 {
                     case 0x8:
                         msg = new NoteOffMessage(channel, b1, b2);
@@ -167,19 +190,34 @@ namespace Transonic.MIDI
                     }
                 }
             }
-            else if (status == 0xF0)            //sysex
+            else if (status == 0xF0)            //sysex message
             {
                 int len = stream.getOne();
-                List<byte> sysExData = new List<byte>(len);
-                for (int i = 0; i < len; i++) 
-                {
-                    byte b1 = (byte)stream.getOne();
-                    sysExData.Add(b1);
-                }            
+                List<byte> sysExData = stream.getRange(len);
+                sysexCont = (sysExData[sysExData.Count - 1] != 0xf7);       //is the last byte of sysex data a F7?
                 msg = new SysExMessage(sysExData);
+                prevSysEx = (SysExMessage)msg;
+                runningStatus = 0;                      //sysex msg cancel running status
+            }
+            else if (status == 0xF7)            
+            {
+                if (sysexCont)                  //sysex continuation - append this data to prev sysex message
+                {
+                    int len = stream.getOne();
+                    List<byte> contData = stream.getRange(len);
+                    sysexCont = (contData[contData.Count - 1] != 0xf7);       //is the last byte of sysex data a F7?
+                    prevSysEx.sysExData.AddRange(contData);
+                }
+                else
+                {                                   //escape sequence
+                    int len = stream.getOne();
+                    List<byte> escData = stream.getRange(len);
+                    msg = new EscapeMessage(escData);                
+                }
+                runningStatus = 0;
             }
             else
-            {
+            {                                   //system common msgs shouldn't occur here, but if they do, we need to skip them
                 int b1 = 0;
                 int b2 = 0;
                 int datalen = SystemMessage.SysMsgLen[status - 0xF0] - 1;
@@ -193,74 +231,145 @@ namespace Transonic.MIDI
                     b1 = ((b1 % 128) * 128) + (b2 % 128);
                 }
                 msg = new SystemMessage(status, b1);
+                runningStatus = 0;
             }
 
             return msg;
         }
 
+        //read data for known meta events & skip any we don't recognize
         private static MetaEvent loadMetaEventData(MidiInStream stream)
         {
-            //new MetaEvent(currentTime, stream);
             MetaEvent meta = null;
             int metatype = stream.getOne();
-            uint metalen = stream.getVariableLengthVal();
+            int metalen = (int)stream.getVariableLengthVal();
+
             switch (metatype)
             {
                 case 0x00:
-                    meta = new SequenceNumberMessage(stream);
+                    if (metalen == 0)
+                    {
+                        meta = new SequenceNumberEvent(currentTime, curTrackNum);
+                    }
+                    if (metalen >= 2 )
+                    {
+                        int val = stream.getTwo();
+                        metalen -= 2;
+                        meta = new SequenceNumberEvent(currentTime, val);
+                    }
                     break;
+
+                //text events
                 case 0x01:
-                    meta = new TextMessage(stream);
+                    String txt = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new TextEvent(currentTime, txt);
                     break;
                 case 0x02:
-                    meta = new CopyrightMessage(stream);
+                    String copyright = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new CopyrightEvent(currentTime, copyright);
                     break;
                 case 0x03:
-                    meta = new TrackNameMessage(stream);
+                    String trackname = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new TrackNameEvent(currentTime, trackname);
                     break;
                 case 0x04:
-                    meta = new InstrumentMessage(stream);
+                    String instrument = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new InstrumentEvent(currentTime, instrument);
                     break;
                 case 0x05:
-                    meta = new LyricMessage(stream);
+                    String lyric = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new LyricEvent(currentTime, lyric);
                     break;
                 case 0x06:
-                    meta = new MarkerMessage(stream);
+                    String marker = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new MarkerEvent(currentTime, marker);
                     break;
                 case 0x07:
-                    meta = new CuePointMessage(stream);
+                    String cue = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new CuePointEvent(currentTime, cue);
                     break;
                 case 0x08:
-                    meta = new PatchNameMessage(stream);
+                    String patchname = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new PatchNameEvent(currentTime, patchname);
                     break;
                 case 0x09:
-                    meta = new DeviceNameMessage(stream);
+                    String devname = stream.getString(metalen);
+                    metalen = 0;
+                    meta = new DeviceNameEvent(currentTime, devname);
                     break;
+
+                //obsolete events
                 case 0x20:
-                    meta = new MidiChannelMessage(stream);
+                    int chanNum = stream.getOne();
+                    metalen -= 1;
+                    meta = new MidiChannelEvent(currentTime, chanNum);
                     break;
                 case 0x21:
-                    meta = new MidiPortMessage(stream);
+                    int portNum = stream.getOne();
+                    metalen -= 1;
+                    meta = new MidiPortEvent(currentTime, portNum);
                     break;
+
+                //end of track event
                 case 0x2f:
-                    meta = new EndofTrackMessage(stream);
+                    meta = new EndofTrackEvent(currentTime);
                     break;
+
+                //timing events
                 case 0x51:
-                    meta = new TempoMessage(stream);
+                    int t1 = stream.getTwo();
+                    int t2 = stream.getOne();
+                    int tempo = (t1 * 65536) + t2;
+                    meta = new TempoEvent(currentTime, tempo);
                     break;
                 case 0x54:
-                    meta = new SMPTEOffsetMessage(stream);
+                    int hr = stream.getOne();
+                    int rr = (hr / 32) % 4;
+                    int hh = hr % 32;
+                    int mn = stream.getOne();
+                    int se = stream.getOne();
+                    int fr = stream.getOne();
+                    int ff = stream.getOne();
+                    metalen -= 5;                    
+                    meta = new SMPTEOffsetEvent(currentTime, rr, hh, mn, se, fr, ff);
                     break;
                 case 0x58:
-                    meta = new TimeSignatureMessage(stream);
+                    int nn = stream.getOne();
+                    int b1 = stream.getOne();
+                    int dd = (int)Math.Pow(2.0, b1);
+                    int cc = stream.getOne();
+                    int bb = stream.getOne();
+                    metalen -= 4;  
+                    meta = new TimeSignatureEvent(currentTime, nn, dd, cc, bb);
                     break;
                 case 0x59:
-                    meta = new KeySignatureMessage(stream);
+                    int sf = stream.getOne();
+                    int mi = stream.getOne();
+                    metalen -= 2;
+                    meta = new KeySignatureEvent(currentTime, sf, mi);
                     break;
+
+                //other people's events
+                case 0x7f:
+                    List<byte> propdata = stream.getRange(metalen);
+                    meta = new ProprietaryEvent(currentTime, propdata);
+                    break;
+
+                //skip any other events
                 default:
-                    meta = new UnknownMetaMessage(stream, metatype);
                     break;
             }
+            stream.skipBytes(metalen);      //skip unknown events & any extra bytes at the end of known events
+            runningStatus = 0;              //meta events cancel running status
+
             return meta;
         }
 
@@ -380,6 +489,18 @@ namespace Transonic.MIDI
             result *= 128;
             result += b;
             return result;
+        }
+
+        public List<byte> getRange(int length)
+        {
+            checkStream(length);
+            List<byte> data = new List<byte>(length);
+            for (int i = 0; i < length; i++)
+            {
+                byte b1 = midiData[dataPos++];
+                data.Add(b1);
+            }
+            return data;
         }
 
         public String getString(int length)

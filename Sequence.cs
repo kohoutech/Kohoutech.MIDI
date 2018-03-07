@@ -37,6 +37,8 @@ namespace Transonic.MIDI
         public List<Track> tracks;
         public TempoMap tempoMap;
 
+        MidiSystem midiSystem;
+
         public Sequence(int _division)
         {
             division = _division;
@@ -66,9 +68,9 @@ namespace Transonic.MIDI
             }
         }
 
-        //public void setMidiSystem(MidiSystem system)
-        //{
-        //    midiSystem = system;
+        public void setMidiSystem(MidiSystem system)
+        {
+            midiSystem = system;
         //    for (int i = 1; i < tracks.Count; i++)
         //    {
         //        //tracks[i].setInputDevice(system.inputDevices[0]);
@@ -76,42 +78,42 @@ namespace Transonic.MIDI
         //        tracks[i].setOutputDevice(system.outputDevices[0]);
         //        tracks[i].setOutputChannel(i-1);
         //    }
-        //}
+        }
 
         //build the tempo map from tempo message ONLY from track 0; tempo messages in other tracks will be IGNORED
         public void calcTempoMap()
         {
-            int time = 0;               //time in MICROseconds
-            int tempo = 0;              //microseconds per quarter note
-            int prevtick = 0;           //tick of prev tempo event
+            //int time = 0;               //time in MICROseconds
+            //int tempo = 0;              //microseconds per quarter note
+            //int prevtick = 0;           //tick of prev tempo event
 
-            Track tempoTrack = tracks[0];
-            for (int i = 0; i < tempoTrack.events.Count; i++)
-            {
-                Event evt = tempoTrack.events[i];
-                if (evt.msg is TempoMessage)
-                {
-                    TempoMessage tempoMsg = (TempoMessage)evt.msg;
-                    int msgtick = (int)evt.time;                                //the tick this tempo message occurs at
-                    int delta = (msgtick - prevtick);                           //amount of ticks at _prev_ tempo
-                    time += (int)((((float)delta) / division) * tempo);         //calc time in microsec of this tempo event
-                    tempoMsg.timing = new Tempo(msgtick, time, 0);
-                    tempoMap.Add(evt);
+            //Track tempoTrack = tracks[0];
+            //for (int i = 0; i < tempoTrack.events.Count; i++)
+            //{
+            //    Event evt = tempoTrack.events[i];
+            //    if (evt.msg is TempoEvent)
+            //    {
+            //        TempoEvent tempoMsg = (TempoEvent)evt.msg;
+            //        int msgtick = (int)evt.time;                                //the tick this tempo message occurs at
+            //        int delta = (msgtick - prevtick);                           //amount of ticks at _prev_ tempo
+            //        time += (int)((((float)delta) / division) * tempo);         //calc time in microsec of this tempo event
+            //        tempoMsg.timing = new Tempo(msgtick, time, 0);
+            //        tempoMap.Add(evt);
 
-                    prevtick = msgtick;
-                    tempo = tempoMsg.tempo;
-                }
-            }
+            //        prevtick = msgtick;
+            //        tempo = tempoMsg.tempo;
+            //    }
+            //}
         }
 
-        public void dump()
-        {
-            for (int i = 0; i < tracks.Count; i++)
-            {
-                Console.WriteLine("contents of track[{0}]", i);
-                tracks[i].dump();
-            }
-        }
+        //public void dump()
+        //{
+        //    for (int i = 0; i < tracks.Count; i++)
+        //    {
+        //        Console.WriteLine("contents of track[{0}]", i);
+        //        tracks[i].dump();
+        //    }
+        //}
 
         public void allNotesOff()
         {

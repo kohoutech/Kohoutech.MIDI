@@ -32,6 +32,7 @@ namespace Transonic.MIDI.Engine
         IMidiView window;           //for updating the UI
 
         Sequence seq;
+        TempoMap tempoMap;
         float playbackSpeed;
         int division;
         int trackCount;
@@ -45,13 +46,14 @@ namespace Transonic.MIDI.Engine
 
         int[] trackPos;        //pos of the next event in each track
         int tempoPos;          //pos of next tempo event
-        TempoMessage curTempo;
+        Tempo curTempo;
 
         bool isPlaying;
 
         public Transport(IMidiView _window)
         {
             window = _window;
+            seq = null;
 
             timer = new MidiTimer();
             timer.Timer += new EventHandler(OnPulse);
@@ -65,6 +67,7 @@ namespace Transonic.MIDI.Engine
         public void setSequence(Sequence _seq)
         {
             seq = _seq;
+            tempoMap = seq.tempoMap;
             division = seq.division;
             trackCount = seq.tracks.Count;
             trackPos = new int[trackCount];
@@ -72,12 +75,12 @@ namespace Transonic.MIDI.Engine
         }
 
         //tempo is len of quarter note in microsecs, division is number of ticks / quarter note
-        public void setTempo(TempoMessage msg)
+        public void setTempo(Tempo tempo)
         {
-            curTempo = msg;
-            if (msg != null)
+            curTempo = tempo;
+            if (tempo != null)
             {
-                tickLen = (long)((curTempo.tempo / (division * playbackSpeed)) * 10.0f);     //len of each tick in 0.1 microsecs (or 100 nanosecs)
+                tickLen = (long)((curTempo.time / (division * playbackSpeed)) * 10.0f);     //len of each tick in 0.1 microsecs (or 100 nanosecs)
             }
             else
             {
@@ -105,15 +108,7 @@ namespace Transonic.MIDI.Engine
             {
                 //set initial tempo
                 tempoPos = 0;
-                if ((seq.tempoMap[0] != null) && (seq.tempoMap[0].time == 0))
-                {
-                    setTempo((TempoMessage)seq.tempoMap[0].msg);
-                    tempoPos++;
-                }
-                else
-                {
-                    setTempo(null);
-                }
+                setTempo(tempoMap.tempos[tempoPos++]);
 
                 tickNum = 0;
                 tickTime = tickLen;                    //time of first tick (not 0 - that would be no ticks)
@@ -178,7 +173,7 @@ namespace Transonic.MIDI.Engine
                 tempoPos--;
                 if (tempoPos >= 0)
                 {
-                    TempoMessage msg = (TempoMessage)seq.tempoMap[tempoPos].msg;
+                    TempoEvent msg = (TempoEvent)seq.tempoMap[tempoPos].msg;
                     setTempo(msg);
 
                     int tickOfs = _ticknum - curTempo.timing.tick;                          //num of ticks from prev tempo msg to now
@@ -243,7 +238,7 @@ namespace Transonic.MIDI.Engine
                 //handle tempo msgs
                 while ((tempoPos < seq.tempoMap.Count) && (tickNum >= seq.tempoMap[tempoPos].time))
                 {
-                    TempoMessage msg = (TempoMessage)seq.tempoMap[tempoPos].msg;
+                    TempoEvent msg = (TempoEvent)seq.tempoMap[tempoPos].msg;
                     setTempo(msg);
                     tempoPos++;           
                 }
@@ -259,13 +254,14 @@ namespace Transonic.MIDI.Engine
                     bool done = (trackPos[trackNum] >= events.Count);
                     while (!done && tickNum >= events[trackPos[trackNum]].time)
                     {
-                        Message msg = events[trackPos[trackNum]].msg;           //get next msg for this track
+                        Event evt = events[trackPos[trackNum]];             //get next event for this track
 
-                        if (!(msg is MetaMessage))
+                        if (!(evt is MetaEvent))
                         {
+                            Message msg = ((MessageEvent)evt).msg;      //get event's midi message
                             track.sendMessage(msg);                     //send it out                            
-                        }
-                        window.handleMessage(trackNum, msg);        //and update the UI 
+                            window.handleMessage(trackNum, msg);        //and update the UI 
+                        }                        
 
                         trackPos[trackNum]++;
                         done = (trackPos[trackNum] >= events.Count);

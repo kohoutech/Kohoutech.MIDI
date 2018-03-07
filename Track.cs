@@ -161,53 +161,53 @@ namespace Transonic.MIDI
 
         public void finalizeLoad() 
         {
-            duration = (int)events[events.Count - 1].time;
-            loadTrackSettings();
+        //    duration = (int)events[events.Count - 1].time;
+        //    loadTrackSettings();
         }
 
         //scan track for name meta event, use the first one we find (should be only one)
-        public void loadTrackSettings() 
-        {
-            bool haveName = false;
-            bool haveOutChannel = false;
-            bool havePatchNum = false;
-            bool haveVolume = false;
-            for (int i = 0; i < events.Count; i++)
-            {
-                if (!haveName && events[i].msg is TrackNameMessage)
-                {
-                    TrackNameMessage nameMsg = (TrackNameMessage)events[i].msg;
-                    name = nameMsg.trackName;
-                    haveName = true;
-                }
+        //public void loadTrackSettings() 
+        //{
+        //    bool haveName = false;
+        //    bool haveOutChannel = false;
+        //    bool havePatchNum = false;
+        //    bool haveVolume = false;
+        //    for (int i = 0; i < events.Count; i++)
+        //    {
+        //        if (!haveName && events[i].msg is TrackNameEvent)
+        //        {
+        //            TrackNameEvent nameMsg = (TrackNameEvent)events[i].msg;
+        //            name = nameMsg.trackName;
+        //            haveName = true;
+        //        }
 
-                if (!haveOutChannel && events[i].msg is NoteOnMessage)
-                {
-                    NoteOnMessage noteMsg = (NoteOnMessage)events[i].msg;
-                    outputChannel = noteMsg.channel;
-                    haveOutChannel = true;
-                }
+        //        if (!haveOutChannel && events[i].msg is NoteOnMessage)
+        //        {
+        //            NoteOnMessage noteMsg = (NoteOnMessage)events[i].msg;
+        //            outputChannel = noteMsg.channel;
+        //            haveOutChannel = true;
+        //        }
 
-                if (!havePatchNum && events[i].msg is PatchChangeMessage)
-                {
-                    PatchChangeMessage patchMsg = (PatchChangeMessage)events[i].msg;
-                    patchNum = patchMsg.patchNumber;
-                    havePatchNum = true;
-                }
+        //        if (!havePatchNum && events[i].msg is PatchChangeMessage)
+        //        {
+        //            PatchChangeMessage patchMsg = (PatchChangeMessage)events[i].msg;
+        //            patchNum = patchMsg.patchNumber;
+        //            havePatchNum = true;
+        //        }
 
-                if (!haveVolume && events[i].msg is ControllerMessage)
-                {
-                    ControllerMessage ctrlMsg = (ControllerMessage)events[i].msg;
-                    if (ctrlMsg.ctrlNumber == 7)
-                    {
-                        volume = ctrlMsg.ctrlValue;
-                        haveVolume = true;
-                    }
-                }
+        //        if (!haveVolume && events[i].msg is ControllerMessage)
+        //        {
+        //            ControllerMessage ctrlMsg = (ControllerMessage)events[i].msg;
+        //            if (ctrlMsg.ctrlNumber == 7)
+        //            {
+        //                volume = ctrlMsg.ctrlValue;
+        //                haveVolume = true;
+        //            }
+        //        }
 
-                if (haveName && haveOutChannel && havePatchNum && haveVolume) break;
-            }
-        }
+        //        if (haveName && haveOutChannel && havePatchNum && haveVolume) break;
+        //    }
+        //}
 
         public void sort()
         {
@@ -218,31 +218,31 @@ namespace Transonic.MIDI
 
         public void saveTrack(MidiOutStream stream)
         {
-            List<byte> data = new List<byte>();
+            //List<byte> data = new List<byte>();
 
-            uint curtime = 0;
-            foreach(Event evt in events) {
-                uint delta = evt.time - curtime;
-                curtime = evt.time;
-                List<byte> vardelta = stream.getVarLenQuantity(delta);
-                data.AddRange(vardelta);
-                byte[] msgbytes = evt.msg.getDataBytes();
-                data.AddRange(msgbytes);
-            }
+            //uint curtime = 0;
+            //foreach(Event evt in events) {
+            //    uint delta = evt.time - curtime;
+            //    curtime = evt.time;
+            //    List<byte> vardelta = stream.getVarLenQuantity(delta);
+            //    data.AddRange(vardelta);
+            //    byte[] msgbytes = evt.msg.getDataBytes();
+            //    data.AddRange(msgbytes);
+            //}
 
-            //track header
-            int size = data.Count;
-            stream.putString("MTrk");
-            stream.putFour(size);
-            stream.putData(data.ToArray());
+            ////track header
+            //int size = data.Count;
+            //stream.putString("MTrk");
+            //stream.putFour(size);
+            //stream.putData(data.ToArray());
         }
 
-        public void dump()
-        {
-            for (int i = 0; i < events.Count; i++)
-            {
-                events[i].dump();
-            }
-        }
+        //public void dump()
+        //{
+        //    for (int i = 0; i < events.Count; i++)
+        //    {
+        //        events[i].dump();
+        //    }
+        //}
     }
 }

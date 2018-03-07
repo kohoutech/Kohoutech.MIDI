@@ -70,160 +70,153 @@ namespace Transonic.MIDI
     //meta event base class
     public class MetaEvent : Event
     {
-        public int datalen;
-
-        public MetaEvent(MidiInStream stream)
-            : base()
-        {
-            datalen = (int)stream.getVariableLengthVal();
+        public MetaEvent(uint time)
+            : base(time)
+        {            
         }
     }
 
-    public class SequenceNumberMessage : MetaEvent    //0xff 0x00
+    public class SequenceNumberEvent : MetaEvent    //0xff 0x00
     {
-        int b1, b2;
+        int val;
 
-        public SequenceNumberMessage(MidiInStream stream)
-            : base(stream)
+        public SequenceNumberEvent(uint time, int _val)
+            : base(time)
         {
-            b1 = 0;
-            b2 = 0;
-            if (datalen > 0)
-            {
-                b1 = stream.getOne();
-                b2 = stream.getOne();
-            }
+            val = _val;
         }
     }
 
-    public class TextMessage : MetaEvent      //0xff 0x01
+    //text events
+    public class TextEvent : MetaEvent      //0xff 0x01
     {
         String text;
 
-        public TextMessage(MidiInStream stream)
-            : base(stream)
+        public TextEvent(uint time, String _text)
+            : base(time)
         {
-            text = stream.getString(datalen);
+            text = _text;
         }
     }
 
-    public class CopyrightMessage : MetaEvent     //0xff 0x02
+    public class CopyrightEvent : MetaEvent     //0xff 0x02
     {
         String copyright;
 
-        public CopyrightMessage(MidiInStream stream)
-            : base(stream)
+        public CopyrightEvent(uint time, String _copy)
+            : base(time)
         {
-            copyright = stream.getString(datalen);
+            copyright = _copy;
         }
     }
 
-    public class TrackNameMessage : MetaEvent     //0xff 0x03
+    public class TrackNameEvent : MetaEvent     //0xff 0x03
     {
         public String trackName;
 
-        public TrackNameMessage(MidiInStream stream)
-            : base(stream)
+        public TrackNameEvent(uint time, String name)
+            : base(time)
         {
-            trackName = stream.getString(datalen);
+            trackName = name;
         }
     }
 
-    public class InstrumentMessage : MetaEvent    //0xff 0x04
+    public class InstrumentEvent : MetaEvent    //0xff 0x04
     {
         public String instrumentName;
 
-        public InstrumentMessage(MidiInStream stream)
-            : base(stream)
+        public InstrumentEvent(uint time, String name)
+            : base(time)
         {
-            instrumentName = stream.getString(datalen);
+            instrumentName = name;
         }
     }
 
-    public class LyricMessage : MetaEvent     //0xff 0x05
+    public class LyricEvent : MetaEvent     //0xff 0x05
     {
         public String lyric;
 
-        public LyricMessage(MidiInStream stream)
-            : base(stream)
+        public LyricEvent(uint time, String _lyric)
+            : base(time)
         {
-            lyric = stream.getString(datalen);
+            lyric = _lyric;
         }
     }
 
-    public class MarkerMessage : MetaEvent        //0xff 0x06
+    public class MarkerEvent : MetaEvent        //0xff 0x06
     {
         public String marker;
 
-        public MarkerMessage(MidiInStream stream)
-            : base(stream)
+        public MarkerEvent(uint time, String _marker)
+            : base(time)
         {
-            marker = stream.getString(datalen);
+            marker = _marker;
         }
     }
 
-    public class CuePointMessage : MetaEvent      //0xff 0x07
+    public class CuePointEvent : MetaEvent      //0xff 0x07
     {
         public String cuePoint;
 
-        public CuePointMessage(MidiInStream stream)
-            : base(stream)
+        public CuePointEvent(uint time, String cue)
+            : base(time)
         {
-            cuePoint = stream.getString(datalen);
+            cuePoint = cue;
         }
     }
 
-    public class PatchNameMessage : MetaEvent        //0xff 0x08
+    public class PatchNameEvent : MetaEvent        //0xff 0x08
     {
         public String patchName;
 
-        public PatchNameMessage(MidiInStream stream)
-            : base(stream)
+        public PatchNameEvent(uint time, String name)
+            : base(time)
         {
-            patchName = stream.getString(datalen);
+            patchName = name;
         }
     }
 
-    public class DeviceNameMessage : MetaEvent        //0xff 0x09
+    public class DeviceNameEvent : MetaEvent        //0xff 0x09
     {
         public String deviceName;
 
-        public DeviceNameMessage(MidiInStream stream)
-            : base(stream)
+        public DeviceNameEvent(uint time, String name)
+            : base(time)
         {
-            deviceName = stream.getString(datalen);
+            deviceName = name;
         }
     }
 
     //obsolete
-    public class MidiChannelMessage : MetaEvent       //0xff 0x20
+    public class MidiChannelEvent : MetaEvent       //0xff 0x20
     {
-        int cc;
+        int channelNum;
 
-        public MidiChannelMessage(MidiInStream stream)
-            : base(stream)
+        public MidiChannelEvent(uint time, int cc)
+            : base(time)
         {
-            cc = stream.getOne();
+            channelNum = cc;
         }
     }
 
     //obsolete
-    public class MidiPortMessage : MetaEvent          //0xff 0x21
+    public class MidiPortEvent : MetaEvent          //0xff 0x21
     {
-        int pp;
+        int portNum;
 
-        public MidiPortMessage(MidiInStream stream)
-            : base(stream)
+        public MidiPortEvent(uint time, int pp)
+            : base(time)
         {
-            pp = stream.getOne();
+            portNum = pp;
         }
     }
 
-    public class EndofTrackMessage : MetaEvent        //0xff 0x2f
+    //end of track
+    public class EndofTrackEvent : MetaEvent        //0xff 0x2f
     {
 
-        public EndofTrackMessage(MidiInStream stream)
-            : base(stream)
+        public EndofTrackEvent(uint time)
+            : base(time)
         {
             //length should be 0
         }
@@ -234,87 +227,82 @@ namespace Transonic.MIDI
         }
     }
 
-    public class TempoMessage : MetaEvent             //0xff 0x51
+    //timing events
+    public class TempoEvent : MetaEvent             //0xff 0x51
     {
-        public int tempo;
-        public Tempo timing;
+        public int tempo;        
 
-        public TempoMessage(MidiInStream stream)
-            : base(stream)
+        public TempoEvent(uint time, int _tempo)
+            : base(time)
         {
-            int b1 = stream.getOne();
-            int b2 = stream.getOne();
-            int b3 = stream.getOne();
-            tempo = ((b1 * 0x100 + b2) * 0x100) + b3;
-            timing = null;
+            tempo = _tempo;            
         }
 
         public override string ToString()
         {
-            return "Tempo = " + tempo + " at time = " + timing.microsec;
+            return "Tempo = " + tempo;
         }
     }
 
-    public class SMPTEOffsetMessage : MetaEvent       //0xff 0x54
+    public class SMPTEOffsetEvent : MetaEvent       //0xff 0x54
     {
-        int hour, min, sec, frame, frame100;
+        int frameRate, hour, min, sec, frame, frame100;
 
-        public SMPTEOffsetMessage(MidiInStream stream)
-            : base(stream)
+        public SMPTEOffsetEvent(uint time, int rr, int hh, int mn, int se, int fr, int ff)
+            : base(time)
         {
-            hour = stream.getOne();
-            min = stream.getOne();
-            sec = stream.getOne();
-            frame = stream.getOne();
-            frame100 = stream.getOne();
+            frameRate = rr;
+            hour = hh;
+            min = mn;
+            sec = se;
+            frame = fr;
+            frame100 = ff;
         }
     }
 
-    public class TimeSignatureMessage : MetaEvent         //0xff 0x58
+    public class TimeSignatureEvent : MetaEvent         //0xff 0x58
     {
-        int numerator;
-        int denominator;
+        int numer;
+        int denom;
         int clicks;
         int clocksPerQuarter;
 
-        public TimeSignatureMessage(MidiInStream stream)
-            : base(stream)
+        public TimeSignatureEvent(uint time, int nn, int dd, int cc, int bb)
+            : base(time)
         {
-            numerator = stream.getOne();
-            int b1 = stream.getOne();
-            denominator = (int)Math.Pow(2.0, b1);
-            clicks = stream.getOne();
-            clocksPerQuarter = stream.getOne();
+            numer = nn;
+            denom = dd;
+            clicks = cc;
+            clocksPerQuarter = bb;
         }
 
         public override string ToString()
         {
-            return "Time Signature = " + numerator + "/" + denominator + " clicks = " + clicks + " clocks/quarter = " + clocksPerQuarter;
+            return "Time Signature = " + numer + "/" + denom + " clicks = " + clicks + " clocks/quarter = " + clocksPerQuarter;
         }
     }
 
-    public class KeySignatureMessage : MetaEvent          //0xff 0x59
+    public class KeySignatureEvent : MetaEvent          //0xff 0x59
     {
-        int sf;
-        int mi;
+        int keySig;
+        bool minor;
 
-        public KeySignatureMessage(MidiInStream stream)
-            : base(stream)
+        public KeySignatureEvent(uint time, int sf, int mi)
+            : base(time)
         {
-            sf = stream.getOne();
-            mi = stream.getOne();
+            keySig = sf;
+            minor = (mi == 1);
         }
     }
 
-    public class UnknownMetaMessage : MetaEvent
+    public class ProprietaryEvent : MetaEvent          //0xff 0x7f
     {
-        int msgtype;
+        List<byte> data;
 
-        public UnknownMetaMessage(MidiInStream stream, int _msgtype)
-            : base(stream)
+        public ProprietaryEvent(uint time, List<byte> _data)
+            : base(time)
         {
-            msgtype = _msgtype;
-            stream.skipBytes(datalen);
+            data = _data;            
         }
     }
 

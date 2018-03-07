@@ -287,7 +287,7 @@ namespace Transonic.MIDI
 
     public class SysExMessage : Message
     {
-        List<byte> sysExData;
+        public List<byte> sysExData;
 
         public SysExMessage(List<byte> _data)
             : base()
@@ -360,6 +360,24 @@ namespace Transonic.MIDI
                 default:
                     break;
             }
+            return bytes;
+        }
+    }
+
+    //to preserve any escape data in a midi file
+    public class EscapeMessage : Message
+    {
+        List<byte> escData;
+
+        public EscapeMessage(List<byte> _data)
+            : base()
+        {
+            escData = _data;
+        }
+
+        override public byte[] getDataBytes()
+        {
+            byte[] bytes = escData.ToArray();
             return bytes;
         }
     }

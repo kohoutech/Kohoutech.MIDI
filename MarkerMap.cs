@@ -24,37 +24,14 @@ using System.Text;
 
 namespace Transonic.MIDI
 {
-    public class TempoMap
+    public class MarkerMap
     {
-        public const int DEFAULTTEMPO = 500000;         //microsec / quarter note = 120 bpm
-
-        public List<Tempo> tempos;
-        public int count;
-
-        public TempoMap()
-        {
-            tempos = new List<Tempo>();
-            Tempo tempo = new Tempo(0, 500000, 0);
-            tempos.Add(tempo);
-            count = 1;
-        }
     }
 
 //-----------------------------------------------------------------------------
 
-    //maps a tempo message or a time signature message to a elapsed time, so if move the cur pos
-    //in a sequence, we can calculate what time that is; needs to be recalculated any time tempo or time sig change
-    public class Tempo
+    public class Marker
     {
-        public int tick;
-        public int time;
-        public int beat;
-
-        public Tempo(int _tick, int _time, int _beat)
-        {
-            tick = _tick;
-            time = _time;
-            beat = _beat;
-        }
     }
+
 }

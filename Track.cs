@@ -29,7 +29,7 @@ namespace Transonic.MIDI
     public class Track : SystemUnit
     {
         public List<Event> events;
-        public int duration;
+        public int length;
 
         //track i/o
         public InputDevice inDev;
@@ -157,6 +157,11 @@ namespace Transonic.MIDI
         public void addEvent(Event evt)
         {
             events.Add(evt);
+            events.Sort();
+            if (evt.time > length)
+            {
+                length = (int)evt.time;
+            }
         }
 
         public void finalizeLoad() 

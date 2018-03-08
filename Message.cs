@@ -79,13 +79,6 @@ namespace Transonic.MIDI
             velocity = vel;
         }
 
-        public NoteOnMessage(MidiInStream stream, int channel)
-            : base(channel)
-        {
-            noteNumber = stream.getOne();
-            velocity = stream.getOne();
-        }
-
         override public byte[] getDataBytes()
         {
             byte[] bytes = new byte[3];
@@ -111,13 +104,6 @@ namespace Transonic.MIDI
         {
             noteNumber = note;
             velocity = vel;
-        }
-
-        public NoteOffMessage(MidiInStream stream, int channel)
-            : base(channel)
-        {
-            noteNumber = stream.getOne();
-            velocity = stream.getOne();
         }
 
         override public byte[] getDataBytes()
@@ -147,13 +133,6 @@ namespace Transonic.MIDI
             pressure = press;
         }
 
-        public AftertouchMessage(MidiInStream stream, int channel)
-            : base(channel)
-        {
-            noteNumber = stream.getOne();
-            pressure = stream.getOne();
-        }
-
         override public byte[] getDataBytes()
         {
             byte[] bytes = new byte[3];
@@ -174,13 +153,6 @@ namespace Transonic.MIDI
         {
             ctrlNumber = num;
             ctrlValue = val;
-        }
-
-        public ControllerMessage(MidiInStream stream, int channel)
-            : base(channel)
-        {
-            ctrlNumber = stream.getOne();
-            ctrlValue = stream.getOne();
         }
 
         override public byte[] getDataBytes()
@@ -208,12 +180,6 @@ namespace Transonic.MIDI
             patchNumber = num;
         }
 
-        public PatchChangeMessage(MidiInStream stream, int channel)
-            : base(channel)
-        {
-            patchNumber = stream.getOne();
-        }
-
         override public byte[] getDataBytes()
         {
             byte[] bytes = new byte[2];
@@ -238,12 +204,6 @@ namespace Transonic.MIDI
             pressure = press;
         }
 
-        public ChannelPressureMessage(MidiInStream stream, int channel)
-            : base(channel)
-        {
-            pressure = stream.getOne();
-        }
-
         override public byte[] getDataBytes()
         {
             byte[] bytes = new byte[2];
@@ -261,14 +221,6 @@ namespace Transonic.MIDI
             : base(channel)
         {
             wheel = _wheel;
-        }
-
-        public PitchWheelMessage(MidiInStream stream, int channel)
-            : base(channel)
-        {
-            int b1 = stream.getOne();
-            int b2 = stream.getOne();
-            wheel = b1 * 128 + b2;
         }
 
         override public byte[] getDataBytes()

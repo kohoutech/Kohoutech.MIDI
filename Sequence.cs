@@ -28,16 +28,18 @@ namespace Transonic.MIDI
 {
     public class Sequence
     {
-        public const int DEFAULTDIVISION = 120;         //bpm
-        public const int DEFAULTTEMPO = 500000;         //microsec / quarter note = 120 bpm
+        public const int DEFAULTDIVISION = 96;         //ticks / quarter note
 
         public int division;                //ppq - ticks (pulses) / quarter note
         public int length;                  //total length in ticks
 
         public List<Track> tracks;
         public TempoMap tempoMap;
+        public MeterMap meterMap;
+        public MarkerMap markerMap;
 
-        MidiSystem midiSystem;
+
+        public Sequence() : this(DEFAULTDIVISION) { }
 
         public Sequence(int _division)
         {
@@ -46,43 +48,37 @@ namespace Transonic.MIDI
 
             tracks = new List<Track>();
             tempoMap = new TempoMap();
+            meterMap = new MeterMap();
+            markerMap = new MarkerMap();
         }
 
         public void addTrack(Track track)
         {
             tracks.Add(track);
+            if (track.length > length)
+            {
+                length = track.length;
+            }
         }
 
         public void deleteTrack(Track track)
         {
-            tracks.Remove(track);
+            tracks.Remove(track);            
         }
 
-        public void finalizeLoad()
-        {
-            calcTempoMap();
-            for (int i = 1; i < tracks.Count; i++) 
-            {
-                tracks[i].finalizeLoad();
-                if (length < tracks[i].duration) length = tracks[i].duration;
-            }
-        }
-
-        public void setMidiSystem(MidiSystem system)
-        {
-            midiSystem = system;
-        //    for (int i = 1; i < tracks.Count; i++)
+        //public void finalizeLoad()
+        //{
+        //    calcTempoMap();
+        //    for (int i = 1; i < tracks.Count; i++) 
         //    {
-        //        //tracks[i].setInputDevice(system.inputDevices[0]);
-        //        //tracks[i].setInputChannel(i);
-        //        tracks[i].setOutputDevice(system.outputDevices[0]);
-        //        tracks[i].setOutputChannel(i-1);
+        //        tracks[i].finalizeLoad();
+        //        if (length < tracks[i].duration) length = tracks[i].duration;
         //    }
-        }
+        //}
 
         //build the tempo map from tempo message ONLY from track 0; tempo messages in other tracks will be IGNORED
-        public void calcTempoMap()
-        {
+        //public void calcTempoMap()
+        //{
             //int time = 0;               //time in MICROseconds
             //int tempo = 0;              //microseconds per quarter note
             //int prevtick = 0;           //tick of prev tempo event
@@ -104,7 +100,7 @@ namespace Transonic.MIDI
             //        tempo = tempoMsg.tempo;
             //    }
             //}
-        }
+        //}
 
         //public void dump()
         //{

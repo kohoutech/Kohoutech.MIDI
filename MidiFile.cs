@@ -69,7 +69,7 @@ namespace Transonic.MIDI
                 seq.addTrack(track);
             }
 
-            seq.finalizeLoad();
+            //seq.finalizeLoad();
             return seq;
         }
 

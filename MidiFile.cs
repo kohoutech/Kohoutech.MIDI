@@ -33,7 +33,6 @@ namespace Transonic.MIDI
 {
     public class MidiFile
     {
-        static uint currentTime;       //event time in ticks
         static int curTrackNum;
         static int runningStatus;
         static bool sysexCont;
@@ -60,21 +59,84 @@ namespace Transonic.MIDI
             }
 
             Sequence seq = new Sequence(division);
+            loadTrackZeroData(stream, seq);
 
             //read midi track data
-            for (int i = 0; i < trackCount; i++)
+            for (int trackNum = 1; trackNum < trackCount; trackNum++)
             {
-                curTrackNum = i;
-                Track track = loadTrackData(stream);
-                seq.addTrack(track);
+                curTrackNum = trackNum;
+                loadTrackData(stream, seq, trackNum);                
             }
 
-            //seq.finalizeLoad();
+            finalizeTracks(seq);
             return seq;
         }
+        
+        //build the tempo, meter and marker maps from tempo message from track 0
+        private static void loadTrackZeroData(MidiInStream stream, Sequence seq)
+        {
+            //read track header
+            String trackSig = stream.getString(4);
+            uint trackDataLength = stream.getFour();
+
+            if (!trackSig.Equals("MTrk"))
+            {
+                throw new MidiFileException(stream.filename + " has an invalid track 0 at ", stream.getDataPos() - 8);
+            }
+
+            int currentTime = 0;        //event time in ticks
+            runningStatus = 0;
+            sysexCont = false;
+            prevSysEx = null;
+            Event evt;
+
+            Meter prevMeter = null;
+
+            int startpos = stream.getDataPos();
+            while ((stream.getDataPos() - startpos) < trackDataLength)
+            {
+                currentTime += (int)stream.getVariableLengthVal();      //add delta time to current num of ticks
+                evt = loadEventData(stream);
+
+                if (evt is TempoEvent)
+                {
+                    Tempo tempo = new Tempo(currentTime, ((TempoEvent)evt).tempo);
+                    seq.tempoMap.addTempo(tempo);
+                }
+                else if (evt is SMPTEOffsetEvent)       //not handling smpte timing yet
+                {
+                }
+                else if (evt is TimeSignatureEvent)
+                {
+                    int keysig = (prevMeter != null) ? prevMeter.keysig : 0;
+                    Meter meter = new Meter(currentTime, ((TimeSignatureEvent)evt).numer, ((TimeSignatureEvent)evt).denom, keysig);
+                    seq.meterMap.addMeter(meter);
+                    prevMeter = meter;
+                }
+                else if (evt is KeySignatureEvent)
+                {
+                    int numer = 4;
+                    int denom = 4;
+                    if (prevMeter != null)
+                    {
+                        numer = prevMeter.numer;
+                        denom = prevMeter.denom;
+                    }
+                    Meter meter = new Meter(currentTime, numer, denom, ((KeySignatureEvent)evt).keySig);
+                    seq.meterMap.addMeter(meter);
+                    prevMeter = meter;
+                }
+                else if (evt is MarkerEvent)
+                {
+                }
+                else if (evt is CuePointEvent)
+                {
+                }
+            } 
+        }        
 
         //read data from a single track chunk
-        private static Track loadTrackData(MidiInStream stream)
+        private static void loadTrackData(MidiInStream stream, Sequence seq, int trackNum)
         {
             //read track header
             String trackSig = stream.getString(4);
@@ -85,24 +147,25 @@ namespace Transonic.MIDI
                 throw new MidiFileException(stream.filename + " has an invalid track at ", stream.getDataPos() - 8);
             }
 
-            Track track = new Track();
+            Track track = seq.addTrack();                           //get new track from sequence
+            track.setName("Track " + trackNum.ToString());
 
-            int startpos = stream.getDataPos();
-            currentTime = 0;
+            int currentTime = 0;                //event time in ticks
             runningStatus = 0;
             sysexCont = false;
             prevSysEx = null;
             Event evt;
+
+            int startpos = stream.getDataPos();
             while ((stream.getDataPos() - startpos) < trackDataLength)
             {
+                currentTime += (int)stream.getVariableLengthVal();      //add delta time to current num of ticks
                 evt = loadEventData(stream);
                 if (evt != null)
                 {
-                    track.addEvent(evt);
+                    track.addEvent(evt, currentTime);
                 }
-            } 
-
-            return track;
+            }        
         }
 
         //read data for a single event in a track's data, convert the event's delta time to an absolute track time
@@ -110,10 +173,8 @@ namespace Transonic.MIDI
         {
             Event evt = null;
 
-            currentTime += stream.getVariableLengthVal();      //add delta time to current num of ticks
-
             int status = stream.getOne();
-            if (status < 0x80)              //running status 
+            if (status < 0x80)                              //running status 
             {
                 stream.pushBack(1);
                 status = runningStatus;
@@ -122,7 +183,7 @@ namespace Transonic.MIDI
             {
                 Message msg = loadMessageData(stream, status);
                 runningStatus = status;
-                evt = new MessageEvent(currentTime, msg);
+                evt = new MessageEvent(msg);
             }
             else if (status == 0xff)                        //meta event
             {
@@ -230,7 +291,7 @@ namespace Transonic.MIDI
                     b2 = stream.getOne();
                     b1 = ((b1 % 128) * 128) + (b2 % 128);
                 }
-                msg = new SystemMessage(status, b1);
+                msg = new SystemMessage(status, b1);      
                 runningStatus = 0;
             }
 
@@ -249,13 +310,13 @@ namespace Transonic.MIDI
                 case 0x00:
                     if (metalen == 0)
                     {
-                        meta = new SequenceNumberEvent(currentTime, curTrackNum);
+                        meta = new SequenceNumberEvent(curTrackNum);
                     }
                     if (metalen >= 2 )
                     {
                         int val = stream.getTwo();
                         metalen -= 2;
-                        meta = new SequenceNumberEvent(currentTime, val);
+                        meta = new SequenceNumberEvent(val);
                     }
                     break;
 
@@ -263,72 +324,73 @@ namespace Transonic.MIDI
                 case 0x01:
                     String txt = stream.getString(metalen);
                     metalen = 0;
-                    meta = new TextEvent(currentTime, txt);
+                    meta = new TextEvent(txt);
                     break;
                 case 0x02:
                     String copyright = stream.getString(metalen);
                     metalen = 0;
-                    meta = new CopyrightEvent(currentTime, copyright);
+                    meta = new CopyrightEvent(copyright);
                     break;
                 case 0x03:
                     String trackname = stream.getString(metalen);
                     metalen = 0;
-                    meta = new TrackNameEvent(currentTime, trackname);
+                    meta = new TrackNameEvent(trackname);
                     break;
                 case 0x04:
                     String instrument = stream.getString(metalen);
                     metalen = 0;
-                    meta = new InstrumentEvent(currentTime, instrument);
+                    meta = new InstrumentEvent(instrument);
                     break;
                 case 0x05:
                     String lyric = stream.getString(metalen);
                     metalen = 0;
-                    meta = new LyricEvent(currentTime, lyric);
+                    meta = new LyricEvent(lyric);
                     break;
                 case 0x06:
                     String marker = stream.getString(metalen);
                     metalen = 0;
-                    meta = new MarkerEvent(currentTime, marker);
+                    meta = new MarkerEvent(marker);
                     break;
                 case 0x07:
                     String cue = stream.getString(metalen);
                     metalen = 0;
-                    meta = new CuePointEvent(currentTime, cue);
+                    meta = new CuePointEvent(cue);
                     break;
                 case 0x08:
                     String patchname = stream.getString(metalen);
                     metalen = 0;
-                    meta = new PatchNameEvent(currentTime, patchname);
+                    meta = new PatchNameEvent(patchname);
                     break;
                 case 0x09:
                     String devname = stream.getString(metalen);
                     metalen = 0;
-                    meta = new DeviceNameEvent(currentTime, devname);
+                    meta = new DeviceNameEvent(devname);
                     break;
 
                 //obsolete events
                 case 0x20:
                     int chanNum = stream.getOne();
                     metalen -= 1;
-                    meta = new MidiChannelEvent(currentTime, chanNum);
+                    meta = new MidiChannelEvent(chanNum);
                     break;
                 case 0x21:
                     int portNum = stream.getOne();
                     metalen -= 1;
-                    meta = new MidiPortEvent(currentTime, portNum);
+                    meta = new MidiPortEvent(portNum);
                     break;
 
                 //end of track event
                 case 0x2f:
-                    meta = new EndofTrackEvent(currentTime);
+                    meta = new EndofTrackEvent();
                     break;
 
                 //timing events
                 case 0x51:
                     int t1 = stream.getTwo();
                     int t2 = stream.getOne();
-                    int tempo = (t1 * 65536) + t2;
-                    meta = new TempoEvent(currentTime, tempo);
+                    int tempo = (t1 * 256) + t2;
+                    metalen -= 3;
+                    meta = new TempoEvent(tempo);
                     break;
                 case 0x54:
                     int hr = stream.getOne();
@@ -339,7 +401,7 @@ namespace Transonic.MIDI
                     int fr = stream.getOne();
                     int ff = stream.getOne();
                     metalen -= 5;                    
-                    meta = new SMPTEOffsetEvent(currentTime, rr, hh, mn, se, fr, ff);
+                    meta = new SMPTEOffsetEvent(rr, hh, mn, se, fr, ff);
                     break;
                 case 0x58:
                     int nn = stream.getOne();
@@ -348,19 +410,20 @@ namespace Transonic.MIDI
                     int cc = stream.getOne();
                     int bb = stream.getOne();
                     metalen -= 4;  
-                    meta = new TimeSignatureEvent(currentTime, nn, dd, cc, bb);
+                    meta = new TimeSignatureEvent(nn, dd, cc, bb);
                     break;
                 case 0x59:
                     int sf = stream.getOne();
                     int mi = stream.getOne();
                     metalen -= 2;
-                    meta = new KeySignatureEvent(currentTime, sf, mi);
+                    meta = new KeySignatureEvent(sf, mi);
                     break;
 
                 //other people's events
                 case 0x7f:
                     List<byte> propdata = stream.getRange(metalen);
-                    meta = new ProprietaryEvent(currentTime, propdata);
+                    metalen = 0;
+                    meta = new ProprietaryEvent(propdata);
                     break;
 
                 //skip any other events
@@ -371,6 +434,58 @@ namespace Transonic.MIDI
             runningStatus = 0;              //meta events cancel running status
 
             return meta;
+        }
+
+        public static void finalizeTracks(Sequence seq)
+        {
+            for (int i = 1; i < seq.tracks.Count; i++)
+            {
+                finalizeTrack(seq.tracks[i]);
+            }
+        }
+
+        public static void finalizeTrack(Track track)
+        {
+
+            bool haveName = false;
+            bool haveOutChannel = false;
+            bool havePatchNum = false;
+            bool haveVolume = false;
+
+            for (int i = 0; i < track.events.Count; i++)
+            {
+                if (!haveName && (track.events[i] is TrackNameEvent))
+                {
+                    track.setName(((TrackNameEvent)track.events[i]).trackName);
+                    haveName = true;
+                }
+
+        //        if (!haveOutChannel && events[i].msg is NoteOnMessage)
+        //        {
+        //            NoteOnMessage noteMsg = (NoteOnMessage)events[i].msg;
+        //            outputChannel = noteMsg.channel;
+        //            haveOutChannel = true;
+        //        }
+
+        //        if (!havePatchNum && events[i].msg is PatchChangeMessage)
+        //        {
+        //            PatchChangeMessage patchMsg = (PatchChangeMessage)events[i].msg;
+        //            patchNum = patchMsg.patchNumber;
+        //            havePatchNum = true;
+        //        }
+
+        //        if (!haveVolume && events[i].msg is ControllerMessage)
+        //        {
+        //            ControllerMessage ctrlMsg = (ControllerMessage)events[i].msg;
+        //            if (ctrlMsg.ctrlNumber == 7)
+        //            {
+        //                volume = ctrlMsg.ctrlValue;
+        //                haveVolume = true;
+        //            }
+        //        }
+
+        //        if (haveName && haveOutChannel && havePatchNum && haveVolume) break;
+            }
         }
 
 //- saving -------------------------------------------------------------------
@@ -393,7 +508,7 @@ namespace Transonic.MIDI
         }
     }
 
-//-----------------------------------------------------------------------------
+//- input stream --------------------------------------------------------------
 
     //midi files store data in big endian format!
     public class MidiInStream
@@ -527,7 +642,7 @@ namespace Transonic.MIDI
         }
     }
 
-//-----------------------------------------------------------------------------
+//- output stream ---------------------------------------------------------------
 
     //midi files store data in big endian format!
     public class MidiOutStream
@@ -610,7 +725,7 @@ namespace Transonic.MIDI
         }
     }
 
-//-----------------------------------------------------------------------------
+//- file exception ------------------------------------------------------------
 
     public class MidiFileException : Exception
     {

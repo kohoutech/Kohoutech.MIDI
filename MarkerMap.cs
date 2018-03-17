@@ -26,6 +26,16 @@ namespace Transonic.MIDI
 {
     public class MarkerMap
     {
+        public Sequence seq;
+        public List<Marker> markers;
+        public int count;
+
+        public MarkerMap(Sequence _seq)
+        {
+            seq = _seq;
+            markers = new List<Marker>();
+            count = 0;
+        }
     }
 
 //-----------------------------------------------------------------------------

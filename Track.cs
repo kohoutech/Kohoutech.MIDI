@@ -28,8 +28,11 @@ namespace Transonic.MIDI
 {
     public class Track : SystemUnit
     {
+        public Sequence seq;
         public List<Event> events;
-        public int length;
+
+        public int length;                  //total length in ticks
+        public int measures;                //num of measures in track
 
         //track i/o
         public InputDevice inDev;
@@ -41,18 +44,21 @@ namespace Transonic.MIDI
         public bool recording;
 
         public int keyOfs;
-        public int VelOfs;
-        public int TimeOfs;
+        public int velOfs;
+        public int timeOfs;
 
         public int bankNum;
         public int patchNum;
         public int volume;
         public int pan;
 
-        public Track() : base("foo")
+        public Track(Sequence _seq)
+            : base("track")
         {
-            name = null;
+            seq = _seq;
             events = new List<Event>();
+            length = 0;
+            measures = 0;
 
             muted = false;
             recording = false;
@@ -61,8 +67,15 @@ namespace Transonic.MIDI
             inputChannel = 1;
             outDev = null;
             outputChannel = 1;
+
+            keyOfs = 0;
+            velOfs = 0;
+            timeOfs = 0;
+
+            bankNum = 0;
             patchNum = 0;
             volume = 127;
+            pan = 64;
         }
 
 //- track settings -----------------------------------------------------------------
@@ -78,14 +91,6 @@ namespace Transonic.MIDI
             if (muted)
             {
                 allNotesOff();
-            }
-        }
-
-        public void setSoloing(bool on)
-        {
-            if (on)
-            {
-                muted = false;
             }
         }
 
@@ -152,71 +157,30 @@ namespace Transonic.MIDI
             }
         }
 
-//- track loading -------------------------------------------------------------
+//- event handling ------------------------------------------------------------
 
-        public void addEvent(Event evt)
+        public void addEvent(Event evt, int tick)
         {
+            evt.setTick(tick);
             events.Add(evt);
-            events.Sort();
-            if (evt.time > length)
+            if (tick > length)
             {
-                length = (int)evt.time;
+                length = tick;
+                if (length > seq.length)
+                {
+                    seq.length = length;
+                }
             }
-        }
 
-        public void finalizeLoad() 
-        {
-        //    duration = (int)events[events.Count - 1].time;
-        //    loadTrackSettings();
-        }
-
-        //scan track for name meta event, use the first one we find (should be only one)
-        //public void loadTrackSettings() 
-        //{
-        //    bool haveName = false;
-        //    bool haveOutChannel = false;
-        //    bool havePatchNum = false;
-        //    bool haveVolume = false;
-        //    for (int i = 0; i < events.Count; i++)
-        //    {
-        //        if (!haveName && events[i].msg is TrackNameEvent)
-        //        {
-        //            TrackNameEvent nameMsg = (TrackNameEvent)events[i].msg;
-        //            name = nameMsg.trackName;
-        //            haveName = true;
-        //        }
-
-        //        if (!haveOutChannel && events[i].msg is NoteOnMessage)
-        //        {
-        //            NoteOnMessage noteMsg = (NoteOnMessage)events[i].msg;
-        //            outputChannel = noteMsg.channel;
-        //            haveOutChannel = true;
-        //        }
-
-        //        if (!havePatchNum && events[i].msg is PatchChangeMessage)
-        //        {
-        //            PatchChangeMessage patchMsg = (PatchChangeMessage)events[i].msg;
-        //            patchNum = patchMsg.patchNumber;
-        //            havePatchNum = true;
-        //        }
-
-        //        if (!haveVolume && events[i].msg is ControllerMessage)
-        //        {
-        //            ControllerMessage ctrlMsg = (ControllerMessage)events[i].msg;
-        //            if (ctrlMsg.ctrlNumber == 7)
-        //            {
-        //                volume = ctrlMsg.ctrlValue;
-        //                haveVolume = true;
-        //            }
-        //        }
-
-        //        if (haveName && haveOutChannel && havePatchNum && haveVolume) break;
-        //    }
-        //}
-
-        public void sort()
-        {
-            events.Sort();
+            seq.meterMap.tickToBeat(tick, out evt.measure, out evt.beat);
+            if (evt.measure > measures)
+            {
+                measures = evt.measure;
+                if (measures > seq.measures)
+                {
+                    seq.measures = measures;
+                }
+            }
         }
 
 //- track saving -------------------------------------------------------------

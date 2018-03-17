@@ -27,21 +27,31 @@ namespace Transonic.MIDI
     //base event class
     public class Event : IComparable<Event>
     {
-        public uint time;
+        public int tick;
+        public int measure;
+        public decimal beat;
 
-        public Event(uint _time)
+        public Event()
         {
-            time = _time;       //time in ticks
+            tick = 0;
+            measure = 0;
+            beat = 0;
         }
 
-        //public void dump()
-        //{
-        //    Console.WriteLine("time = {0}, msg = {1}", time, msg);
-        //}
+        public void setTick(int _tick) 
+        {
+            tick = _tick;
+        }
+
+        public void setBeat(int _measure, decimal _beat)
+        {
+            measure = _measure;
+            beat = _beat;
+        }
 
         public int CompareTo(Event other)
         {
-            return this.time.CompareTo(other.time);
+            return this.tick.CompareTo(other.tick);
         }
     }
 
@@ -53,12 +63,11 @@ namespace Transonic.MIDI
     {
         public Message msg;
 
-        public MessageEvent(uint time, Message _msg)
-            : base(time)
+        public MessageEvent(Message _msg)
+            : base()
         {
             msg = _msg;         //midi message
         }
-
     }
 
 //-----------------------------------------------------------------------------
@@ -70,8 +79,8 @@ namespace Transonic.MIDI
     //meta event base class
     public class MetaEvent : Event
     {
-        public MetaEvent(uint time)
-            : base(time)
+        public MetaEvent()
+            : base()
         {            
         }
     }
@@ -80,8 +89,8 @@ namespace Transonic.MIDI
     {
         int val;
 
-        public SequenceNumberEvent(uint time, int _val)
-            : base(time)
+        public SequenceNumberEvent(int _val)
+            : base()
         {
             val = _val;
         }
@@ -92,8 +101,8 @@ namespace Transonic.MIDI
     {
         String text;
 
-        public TextEvent(uint time, String _text)
-            : base(time)
+        public TextEvent(String _text)
+            : base()
         {
             text = _text;
         }
@@ -103,8 +112,8 @@ namespace Transonic.MIDI
     {
         String copyright;
 
-        public CopyrightEvent(uint time, String _copy)
-            : base(time)
+        public CopyrightEvent(String _copy)
+            : base()
         {
             copyright = _copy;
         }
@@ -114,8 +123,8 @@ namespace Transonic.MIDI
     {
         public String trackName;
 
-        public TrackNameEvent(uint time, String name)
-            : base(time)
+        public TrackNameEvent(String name)
+            : base()
         {
             trackName = name;
         }
@@ -125,8 +134,8 @@ namespace Transonic.MIDI
     {
         public String instrumentName;
 
-        public InstrumentEvent(uint time, String name)
-            : base(time)
+        public InstrumentEvent(String name)
+            : base()
         {
             instrumentName = name;
         }
@@ -136,8 +145,8 @@ namespace Transonic.MIDI
     {
         public String lyric;
 
-        public LyricEvent(uint time, String _lyric)
-            : base(time)
+        public LyricEvent(String _lyric)
+            : base()
         {
             lyric = _lyric;
         }
@@ -147,8 +156,8 @@ namespace Transonic.MIDI
     {
         public String marker;
 
-        public MarkerEvent(uint time, String _marker)
-            : base(time)
+        public MarkerEvent(String _marker)
+            : base()
         {
             marker = _marker;
         }
@@ -158,8 +167,8 @@ namespace Transonic.MIDI
     {
         public String cuePoint;
 
-        public CuePointEvent(uint time, String cue)
-            : base(time)
+        public CuePointEvent(String cue)
+            : base()
         {
             cuePoint = cue;
         }
@@ -169,8 +178,8 @@ namespace Transonic.MIDI
     {
         public String patchName;
 
-        public PatchNameEvent(uint time, String name)
-            : base(time)
+        public PatchNameEvent(String name)
+            : base()
         {
             patchName = name;
         }
@@ -180,8 +189,8 @@ namespace Transonic.MIDI
     {
         public String deviceName;
 
-        public DeviceNameEvent(uint time, String name)
-            : base(time)
+        public DeviceNameEvent(String name)
+            : base()
         {
             deviceName = name;
         }
@@ -192,8 +201,8 @@ namespace Transonic.MIDI
     {
         int channelNum;
 
-        public MidiChannelEvent(uint time, int cc)
-            : base(time)
+        public MidiChannelEvent(int cc)
+            : base()
         {
             channelNum = cc;
         }
@@ -204,8 +213,8 @@ namespace Transonic.MIDI
     {
         int portNum;
 
-        public MidiPortEvent(uint time, int pp)
-            : base(time)
+        public MidiPortEvent(int pp)
+            : base()
         {
             portNum = pp;
         }
@@ -215,8 +224,8 @@ namespace Transonic.MIDI
     public class EndofTrackEvent : MetaEvent        //0xff 0x2f
     {
 
-        public EndofTrackEvent(uint time)
-            : base(time)
+        public EndofTrackEvent()
+            : base()
         {
             //length should be 0
         }
@@ -232,8 +241,8 @@ namespace Transonic.MIDI
     {
         public int tempo;        
 
-        public TempoEvent(uint time, int _tempo)
-            : base(time)
+        public TempoEvent(int _tempo)
+            : base()
         {
             tempo = _tempo;            
         }
@@ -248,8 +257,8 @@ namespace Transonic.MIDI
     {
         int frameRate, hour, min, sec, frame, frame100;
 
-        public SMPTEOffsetEvent(uint time, int rr, int hh, int mn, int se, int fr, int ff)
-            : base(time)
+        public SMPTEOffsetEvent(int rr, int hh, int mn, int se, int fr, int ff)
+            : base()
         {
             frameRate = rr;
             hour = hh;
@@ -262,13 +271,13 @@ namespace Transonic.MIDI
 
     public class TimeSignatureEvent : MetaEvent         //0xff 0x58
     {
-        int numer;
-        int denom;
-        int clicks;
-        int clocksPerQuarter;
+        public int numer;
+        public int denom;
+        public int clicks;
+        public int clocksPerQuarter;
 
-        public TimeSignatureEvent(uint time, int nn, int dd, int cc, int bb)
-            : base(time)
+        public TimeSignatureEvent(int nn, int dd, int cc, int bb)
+            : base()
         {
             numer = nn;
             denom = dd;
@@ -284,11 +293,11 @@ namespace Transonic.MIDI
 
     public class KeySignatureEvent : MetaEvent          //0xff 0x59
     {
-        int keySig;
-        bool minor;
+        public int keySig;
+        public bool minor;
 
-        public KeySignatureEvent(uint time, int sf, int mi)
-            : base(time)
+        public KeySignatureEvent(int sf, int mi)
+            : base()
         {
             keySig = sf;
             minor = (mi == 1);
@@ -299,12 +308,10 @@ namespace Transonic.MIDI
     {
         List<byte> data;
 
-        public ProprietaryEvent(uint time, List<byte> _data)
-            : base(time)
+        public ProprietaryEvent(List<byte> _data)
+            : base()
         {
             data = _data;            
         }
     }
-
-
 }

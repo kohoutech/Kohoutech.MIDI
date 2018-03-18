@@ -154,18 +154,28 @@ namespace Transonic.MIDI
             runningStatus = 0;
             sysexCont = false;
             prevSysEx = null;
-            Event evt;
+            Event evt = null;
 
             int startpos = stream.getDataPos();
             while ((stream.getDataPos() - startpos) < trackDataLength)
             {
                 currentTime += (int)stream.getVariableLengthVal();      //add delta time to current num of ticks
                 evt = loadEventData(stream);
-                if (evt != null)
+                if ((evt != null) && !(evt is EndofTrackEvent || 
+                    evt is MarkerEvent || evt is CuePointEvent ||           //these are ignored in tracks other than track 0
+                    evt is TempoEvent || evt is SMPTEOffsetEvent ||
+                    evt is TimeSignatureEvent || evt is KeySignatureEvent))
                 {
                     track.addEvent(evt, currentTime);
                 }
-            }        
+            }
+
+            //last event in track must be an "end of track" event
+            if ((evt != null) && !(evt is EndofTrackEvent))
+            {
+                throw new MidiFileException(stream.filename + ": track " + curTrackNum.ToString() +
+                "missing end of track event at ", stream.getDataPos() - 8);
+            }
         }
 
         //read data for a single event in a track's data, convert the event's delta time to an absolute track time
@@ -438,9 +448,18 @@ namespace Transonic.MIDI
 
         public static void finalizeTracks(Sequence seq)
         {
-            for (int i = 1; i < seq.tracks.Count; i++)
+            for (int i = 0; i < seq.tracks.Count; )
             {
-                finalizeTrack(seq.tracks[i]);
+                if (seq.tracks[i].events.Count == 0)
+                {
+                    Track track = seq.tracks[i];
+                    seq.deleteTrack(track);
+                }
+                else
+                {
+                    finalizeTrack(seq.tracks[i]);
+                    i++;
+                }
             }
         }
 
@@ -448,9 +467,7 @@ namespace Transonic.MIDI
         {
 
             bool haveName = false;
-            bool haveOutChannel = false;
-            bool havePatchNum = false;
-            bool haveVolume = false;
+            bool seenNoteOn = false;
 
             for (int i = 0; i < track.events.Count; i++)
             {
@@ -460,31 +477,38 @@ namespace Transonic.MIDI
                     haveName = true;
                 }
 
-        //        if (!haveOutChannel && events[i].msg is NoteOnMessage)
-        //        {
-        //            NoteOnMessage noteMsg = (NoteOnMessage)events[i].msg;
-        //            outputChannel = noteMsg.channel;
-        //            haveOutChannel = true;
-        //        }
+                //scan events for these values only before the first note on event
+                if ((!seenNoteOn) && (track.events[i] is MessageEvent))
+                {
+                    Message msg = ((MessageEvent)track.events[i]).msg;
 
-        //        if (!havePatchNum && events[i].msg is PatchChangeMessage)
-        //        {
-        //            PatchChangeMessage patchMsg = (PatchChangeMessage)events[i].msg;
-        //            patchNum = patchMsg.patchNumber;
-        //            havePatchNum = true;
-        //        }
+                    if (msg is NoteOnMessage)
+                    {
+                        track.setOutputChannel(((NoteOnMessage)msg).channel);
+                        seenNoteOn = true;
+                    }
 
-        //        if (!haveVolume && events[i].msg is ControllerMessage)
-        //        {
-        //            ControllerMessage ctrlMsg = (ControllerMessage)events[i].msg;
-        //            if (ctrlMsg.ctrlNumber == 7)
-        //            {
-        //                volume = ctrlMsg.ctrlValue;
-        //                haveVolume = true;
-        //            }
-        //        }
+                    if (msg is PatchChangeMessage)
+                    {
+                        track.setPatchNum(((PatchChangeMessage)msg).patchNumber);
+                    }
 
-        //        if (haveName && haveOutChannel && havePatchNum && haveVolume) break;
+                    if (msg is ControllerMessage)
+                    {
+                        ControllerMessage ctrlMsg = (ControllerMessage)msg;
+                        if (ctrlMsg.ctrlNumber == 7)
+                        {
+                            track.setVolume(ctrlMsg.ctrlValue);
+                        }
+
+                        if (ctrlMsg.ctrlNumber == 10)
+                        {
+                            track.setPan(ctrlMsg.ctrlValue);
+                        }
+                    }
+                }
+
+                if (haveName && seenNoteOn) break;
             }
         }
 

@@ -103,13 +103,12 @@ namespace Transonic.MIDI
             int meterPos;
             Meter meter = findMeter(tick, out meterPos);
 
-            int beatticks = (seq.division * 4) / meter.denom;
-            int measureticks = (beatticks * meter.numer);
+            int measureticks = (int)(seq.division * ((float)meter.numer * 4 / meter.denom));
 
             int ticks = tick - meter.tick;
             measure = meter.measure + (ticks / measureticks);
             ticks = ticks % measureticks;
-            beat = ((decimal)ticks / beatticks) + 1;            
+            beat = ((decimal)ticks / seq.division);
         }
     }
 

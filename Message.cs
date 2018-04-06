@@ -31,6 +31,94 @@ namespace Transonic.MIDI
 
 //- static methods ------------------------------------------------------------
 
+        public static Message getMessage(byte[] data)
+        {
+            Message msg = null;
+
+            int status = data[0];
+            if (status < 0xF0)          //midi channel message
+            {
+                int msgtype = status / 16;
+                int channel = status % 16;
+
+                int b1 = data[1];
+                int b2 = 0;
+                if ((msgtype != 0xC) && (msgtype != 0xD))
+                {
+                    b2 = data[2];
+                }
+
+                msg = Message.getChannelMessage(msgtype, channel, b1, b2);
+            }
+            else if (status == 0xF0)                        //sys ex msg
+            {
+                List<byte> bytes = new List<byte>(data);
+                msg = new SysExMessage(bytes);
+            }
+            else
+            {                                   //status msg
+                int b1 = 0;
+                int b2 = 0;
+                int datalen = SystemMessage.SysMsgLen[status - 0xF0] - 1;
+                if (datalen > 0)
+                {
+                    b1 = data[1];
+                }
+                if (datalen > 1)
+                {
+                    b2 = data[2];
+                    b1 = ((b1 % 128) * 128) + (b2 % 128);
+                }
+                msg = new SystemMessage(status, b1);
+            }
+
+            return msg;
+        }
+
+        public static Message getChannelMessage(int msgtype, int channel, int b1, int b2)
+        {
+            Message msg = null;
+
+            switch (msgtype)
+            {
+                case 0x8:
+                    msg = new NoteOffMessage(channel, b1, b2);
+                    break;
+                case 0x9:
+                    msg = new NoteOnMessage(channel, b1, b2);
+                    break;
+                case 0xa:
+                    msg = new AftertouchMessage(channel, b1, b2);
+                    break;
+                case 0xb:
+                    msg = new ControllerMessage(channel, b1, b2);
+                    break;
+                case 0xc:
+                    msg = new PatchChangeMessage(channel, b1);
+                    break;
+                case 0xd:
+                    msg = new ChannelPressureMessage(channel, b1);
+                    break;
+                case 0xe:
+                    int wheelamt = ((b1 % 128) * 128) + (b2 % 128);
+                    msg = new PitchWheelMessage(channel, wheelamt);
+                    break;
+                default:
+                    break;
+            }
+            //convert noteon msg w/ vel = 0 to noteoff msg
+            if (msg is NoteOnMessage)
+            {
+                NoteOnMessage noteOn = (NoteOnMessage)msg;
+                if (noteOn.velocity == 0)
+                {
+                    NoteOffMessage noteOff = new NoteOffMessage(noteOn.channel, noteOn.noteNumber, 0);
+                    msg = noteOff;
+                }
+            }
+            return msg;
+        }
+
 //- base class ----------------------------------------------------------------
 
         public Message()

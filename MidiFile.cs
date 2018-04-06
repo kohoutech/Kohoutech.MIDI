@@ -223,43 +223,7 @@ namespace Transonic.MIDI
                     b2 = stream.getOne();
                 }
 
-                switch (msgtype)        
-                {
-                    case 0x8:
-                        msg = new NoteOffMessage(channel, b1, b2);
-                        break;
-                    case 0x9:
-                        msg = new NoteOnMessage(channel, b1, b2);
-                        break;
-                    case 0xa:
-                        msg = new AftertouchMessage(channel, b1, b2);
-                        break;
-                    case 0xb:
-                        msg = new ControllerMessage(channel, b1, b2);
-                        break;
-                    case 0xc:
-                        msg = new PatchChangeMessage(channel, b1);
-                        break;
-                    case 0xd:
-                        msg = new ChannelPressureMessage(channel, b1);
-                        break;
-                    case 0xe:
-                        int wheelamt = ((b1 % 128) * 128) + (b2 % 128);
-                        msg = new PitchWheelMessage(channel, wheelamt);
-                        break;
-                    default:
-                        break;
-                }
-                //convert noteon msg w/ vel = 0 to noteoff msg
-                if (msg is NoteOnMessage)
-                {
-                    NoteOnMessage noteOn = (NoteOnMessage)msg;
-                    if (noteOn.velocity == 0)
-                    {
-                        NoteOffMessage noteOff = new NoteOffMessage(noteOn.channel, noteOn.noteNumber, 0);
-                        msg = noteOff;
-                    }
-                }
+                msg = Message.getChannelMessage(msgtype, channel, b1, b2);
             }
             else if (status == 0xF0)            //sysex message
             {

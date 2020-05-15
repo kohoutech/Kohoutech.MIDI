@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic MIDI Library
-Copyright (C) 1995-2018  George E Greaney
+Kohoutech MIDI Library
+Copyright (C) 1995-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -25,7 +25,7 @@ using System.Runtime.InteropServices;
 
 // p/invoke calls and structs used with WINMM.DLL library taken from http://www.pinvoke.net
 
-namespace Transonic.MIDI.System
+namespace Kohoutech.MIDI.System
 {
     public class InputDevice
     {
@@ -54,8 +54,8 @@ namespace Transonic.MIDI.System
         public IntPtr devHandle;
 
         private MidiInProc midiInProc;
-        private bool opened;
-        private bool started;
+        public bool opened;
+        public bool started;
         
         const int CALLBACK_FUNCTION = 0x30000;
 
@@ -73,9 +73,20 @@ namespace Transonic.MIDI.System
 
         public void connectUnit(SystemUnit unit)
         {
-            unitList.Add(unit);
+            if (unit != null)
+            {
+                unitList.Add(unit);
+            }
         }
 
+        public void disconnectUnit(SystemUnit unit)
+        {
+            if (unit != null)
+            {
+                unitList.Remove(unit);
+            }
+        }
+        
 // midi funcs -----------------------------------------------------------------
 
         //open the input device and set its event handler to HandleMessage()

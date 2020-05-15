@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic MIDI Library
-Copyright (C) 1995-2018  George E Greaney
+Kohoutech MIDI Library
+Copyright (C) 1995-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -25,7 +25,7 @@ using System.Runtime.InteropServices;
 
 // p/invoke calls and structs used with WINMM.DLL library taken from http://www.pinvoke.net
 
-namespace Transonic.MIDI.System
+namespace Kohoutech.MIDI.System
 {
     public class MidiSystem
     {       
@@ -99,17 +99,26 @@ namespace Transonic.MIDI.System
         public List<String> getInDevNameList()
         {
             List<String> nameList = new List<String>();
-            foreach (InputDevice indev in inputDevices) 
+            foreach (InputDevice indev in inputDevices)
             {
                 nameList.Add(indev.devName);
             }
-            if (nameList.Count == 0) nameList.Add("none");
+            return nameList;
+        }
+
+        public List<String> getInDevNameListNoInput()
+        {
+            List<String> nameList = new List<String>();
+            nameList.Add("no input");
+            nameList.AddRange(getInDevNameList());
             return nameList;
         }
 
         public InputDevice findInputDevice(String inName)
         {
             InputDevice result = null;
+            if (inName.Equals("no input")) return result;
+
             foreach (InputDevice indev in inputDevices)
             {
                 if (indev.devName.Equals(inName)) {
@@ -127,13 +136,22 @@ namespace Transonic.MIDI.System
             {
                 nameList.Add(outdev.devName);
             }
-            if (nameList.Count == 0) nameList.Add("none");
+            return nameList;
+        }
+
+        public List<String> getOutDevNameListNoOutput()
+        {
+            List<String> nameList = new List<String>();
+            nameList.Add("no output");
+            nameList.AddRange(getOutDevNameList());
             return nameList;
         }
 
         public OutputDevice findOutputDevice(String outName)
         {
             OutputDevice result = null;
+            if (outName.Equals("no input")) return result;
+
             foreach (OutputDevice outdev in outputDevices)
             {
                 if (outdev.devName.Equals(outName)) {

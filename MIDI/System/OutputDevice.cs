@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic MIDI Library
-Copyright (C) 1995-2018  George E Greaney
+Kohoutech MIDI Library
+Copyright (C) 1995-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -23,11 +23,11 @@ using System.Linq;
 using System.Text;
 using System.Runtime.InteropServices;
 
-using Transonic.MIDI;
+using Kohoutech.MIDI;
 
 // p/invoke calls and structs used with WINMM.DLL library taken from http://www.pinvoke.net
 
-namespace Transonic.MIDI.System
+namespace Kohoutech.MIDI.System
 {
     public class OutputDevice
     {

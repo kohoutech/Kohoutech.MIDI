@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic MIDI Library
-Copyright (C) 1995-2018  George E Greaney
+Kohoutech MIDI Library
+Copyright (C) 1995-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -23,13 +23,13 @@ using System.Linq;
 using System.Text;
 using System.IO;
 
-using Transonic.MIDI.System;
+using Kohoutech.MIDI.System;
 
 //J Glatt's Midi page: http://midi.teragonaudio.com/tech/midifile.htm
 //Somascape's MIDI Files Specification: http://www.somascape.org/midi/tech/mfile.html
 //Standard MIDI-File Format Spec. 1.1 http://www.music.mcgill.ca/~ich/classes/mumt306/midiformat.pdf
 
-namespace Transonic.MIDI
+namespace Kohoutech.MIDI
 {
     public class MidiFile
     {

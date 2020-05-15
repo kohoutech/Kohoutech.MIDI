@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic MIDI Library
-Copyright (C) 1995-2018  George E Greaney
+Kohoutech MIDI Library
+Copyright (C) 1995-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,7 +22,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Transonic.MIDI.System
+namespace Kohoutech.MIDI.System
 {
     public abstract class SystemUnit
     {
@@ -48,3 +48,5 @@ namespace Transonic.MIDI.System
         }
     }
 }
+
+//Console.WriteLine("there's no sun in the shadow of the wizard");

@@ -1,6 +1,6 @@
 ﻿/* ----------------------------------------------------------------------------
-Transonic MIDI Library
-Copyright (C) 1995-2018  George E Greaney
+Kohoutech MIDI Library
+Copyright (C) 1995-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -24,7 +24,7 @@ using System.Text;
 
 //J Glatt's Midi page: http://midi.teragonaudio.com/tech/midispec.htm
 
-namespace Transonic.MIDI
+namespace Kohoutech.MIDI
 {
     public class Message
     {

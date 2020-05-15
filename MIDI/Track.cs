@@ -1,6 +1,6 @@
 /* ----------------------------------------------------------------------------
-Transonic MIDI Library
-Copyright (C) 1995-2018  George E Greaney
+Kohoutech MIDI Library
+Copyright (C) 1995-2020  George E Greaney
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -22,9 +22,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-using Transonic.MIDI.System;
+using Kohoutech.MIDI.System;
 
-namespace Transonic.MIDI
+namespace Kohoutech.MIDI
 {
     public class Track : SystemUnit
     {
